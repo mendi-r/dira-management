@@ -84,7 +84,7 @@ export default function Bochurim() {
   async function loadHistory(bocherid) {
     const { data } = await supabase
       .from('shibutzim')
-      .select('*, dirot(ktovet,ir)')
+      .select('*, dirot!dirot_id(ktovet,ir)')
       .eq('bochurim_id', bocherid)
       .order('taarich_tchila', { ascending: false })
     setHistory(data ?? [])
