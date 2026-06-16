@@ -182,8 +182,7 @@ export default function Dashboard() {
           <StatCard label="שיבוצים פעילים" value={shibutzimCount} icon={Shuffle} color="green"/>
         </Clickable>
         <Clickable to="/bochurim" params={{ unassigned:'true' }}>
-          <StatCard label="ללא שיבוץ" value={unassigned.length} icon={Users} color="amber"
-            sub={unassigned.length > 0 ? unassigned.slice(0,2).map(b=>`${b.shem} ${b.mishpacha}`).join(', ') : 'כולם משובצים'}/>
+          <StatCard label="ללא שיבוץ" value={unassigned.length} icon={Users} color="amber"/>
         </Clickable>
         <Clickable to="/dirot" params={{ free_beds:'true' }}>
           <StatCard label="דירות פנויות" value={freeApartments} icon={Bed} color="teal"
