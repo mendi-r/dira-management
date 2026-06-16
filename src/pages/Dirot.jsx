@@ -48,7 +48,8 @@ const TABS = [
   { key:'chozeh',  label:'חוזה ותשלום' },
   { key:'bituach', label:'ביטוח' },
   { key:'docs',    label:'מסמכים' },
-  { key:'history', label:'היסטוריה' },
+  { key:'chozim',  label:'היסטוריית חוזים' },
+  { key:'history', label:'שיבוצים' },
 ]
 
 export default function Dirot() {
@@ -72,14 +73,17 @@ export default function Dirot() {
   const [renewModal, setRenewModal] = useState(false)
   const [renewForm, setRenewForm]   = useState({ tchilat_schirut:'', mispar_chodashim:'', ola_schirut_chodshi:'' })
   const [renewSaving, setRenewSaving] = useState(false)
+  const [chozim, setChozim]           = useState([])
+  const [chozimCountMap, setChozimCountMap] = useState({})
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     let q = supabase.from('dirot').select('*').order('ktovet')
     if (statusFilter) q = q.eq('status', statusFilter)
-    const [{ data }, { data: activeShibutzim }] = await Promise.all([
+    const [{ data }, { data: activeShibutzim }, { data: chozimAll }] = await Promise.all([
       q,
       supabase.from('shibutzim').select('dirot_id').eq('status','פעיל'),
+      supabase.from('chozim').select('dirot_id'),
     ])
     const rows = data ?? []
     // ספירת משובצים פעילים לכל דירה
@@ -88,6 +92,12 @@ export default function Dirot() {
       if (s.dirot_id) oMap[s.dirot_id] = (oMap[s.dirot_id] ?? 0) + 1
     })
     setOccupantsMap(oMap)
+    // ספירת חוזים לכל דירה
+    const cMap = {}
+    ;(chozimAll ?? []).forEach(c => {
+      if (c.dirot_id) cMap[c.dirot_id] = (cMap[c.dirot_id] ?? 0) + 1
+    })
+    setChozimCountMap(cMap)
     setRows(rows)
     const warn = rows.filter(r => {
       const dc = r.sofit_schirut ? daysUntil(r.sofit_schirut) : null
@@ -101,12 +111,18 @@ export default function Dirot() {
   useEffect(() => { load() }, [load])
 
   async function loadHistory(dirotId) {
-    const { data } = await supabase
-      .from('shibutzim')
-      .select('*, bochurim!bochurim_id(shem,mishpacha)')
-      .eq('dirot_id', dirotId)
-      .order('taarich_tchila', { ascending: false })
-    setHistory(data ?? [])
+    const [{ data: shibs }, { data: chozimRows }] = await Promise.all([
+      supabase.from('shibutzim')
+        .select('*, bochurim!bochurim_id(shem,mishpacha)')
+        .eq('dirot_id', dirotId)
+        .order('taarich_tchila', { ascending: false }),
+      supabase.from('chozim')
+        .select('*')
+        .eq('dirot_id', dirotId)
+        .order('tchilat_schirut', { ascending: false }),
+    ])
+    setHistory(shibs ?? [])
+    setChozim(chozimRows ?? [])
   }
 
   const filtered = rows.filter(r => {
@@ -230,6 +246,15 @@ export default function Dirot() {
     if (isNew && payload.tchilat_schirut && payload.mispar_chodashim && payload.ola_schirut_chodshi) {
       await createOwnerPayments(data.id, payload.tchilat_schirut, payload.mispar_chodashim,
         payload.ola_schirut_chodshi, payload.payment_day ?? 1)
+      // רישום החוזה הראשון בהיסטוריית חוזים
+      await supabase.from('chozim').insert({
+        dirot_id: data.id,
+        tchilat_schirut: payload.tchilat_schirut,
+        sofit_schirut: payload.sofit_schirut || null,
+        mispar_chodashim: payload.mispar_chodashim,
+        ola_schirut_chodshi: payload.ola_schirut_chodshi,
+        status: 'פעיל',
+      })
     }
 
     // הגדלת חודשי שכירות: יצירת תשלומים לחודשים החדשים (גם אם לא היו בכלל)
@@ -386,6 +411,18 @@ export default function Dirot() {
       await recalcGviyaForDira(form.id, newRent, tchilat_schirut)
     }
 
+    // עדכון היסטוריית חוזים: סגירת הנוכחי + פתיחת חדש
+    await supabase.from('chozim').update({ status: 'הסתיים' })
+      .eq('dirot_id', form.id).eq('status', 'פעיל')
+    await supabase.from('chozim').insert({
+      dirot_id: form.id,
+      tchilat_schirut,
+      sofit_schirut: newEnd || null,
+      mispar_chodashim: newMonths,
+      ola_schirut_chodshi: newRent,
+      status: 'פעיל',
+    })
+
     logActivity('RENEW', 'dirot', form.id, form.ktovet)
     toast('החוזה חודש בהצלחה')
     setRenewSaving(false)
@@ -393,11 +430,67 @@ export default function Dirot() {
     setForm(f => ({ ...f, tchilat_schirut, mispar_chodashim: newMonths, sofit_schirut: newEnd || '', ola_schirut_chodshi: newRent }))
     setOriginalRent(newRent)
     setOriginalMisparChodashim(newMonths)
+    loadHistory(form.id)
+    load(true)
+  }
+
+  /** ביטול חוזה ספציפי + תשלומים לבעלים שלו */
+  async function removeChoza(choza) {
+    const from = formatDate(choza.tchilat_schirut)
+    const to   = formatDate(choza.sofit_schirut)
+    const fromYM = choza.tchilat_schirut ? choza.tchilat_schirut.slice(0,7) : null
+    const toYM   = choza.sofit_schirut   ? choza.sofit_schirut.slice(0,7)   : null
+
+    // בדיקת תשלומים לבעלים בתקופה זו
+    let q = supabase.from('tashlumim_baalim').select('id, status').eq('dirot_id', form.id)
+    if (fromYM) q = q.gte('chodesh', fromYM)
+    if (toYM)   q = q.lte('chodesh', toYM)
+    const { data: tashlumim } = await q
+
+    if (tashlumim?.length > 0) {
+      const paid   = tashlumim.filter(t => t.status === 'שולם').length
+      const unpaid = tashlumim.length - paid
+      const paidNote = paid > 0 ? `\n⚠️ ${paid} מהם שולמו כבר!` : ''
+      const ok = await confirm(
+        `ביטול חוזה ${from} — ${to}\n\n` +
+        `יש ${tashlumim.length} תשלומים לבעלים בתקופה זו (${unpaid} לא שולמו${paidNote}).\n\n` +
+        `האם למחוק גם את התשלומים?`,
+        { danger: true, confirmText: 'בטל חוזה ומחק תשלומים', cancelText: 'ביטול' }
+      )
+      if (!ok) return
+      let dq = supabase.from('tashlumim_baalim').delete().eq('dirot_id', form.id)
+      if (fromYM) dq = dq.gte('chodesh', fromYM)
+      if (toYM)   dq = dq.lte('chodesh', toYM)
+      await dq
+    } else {
+      if (!await confirm(`לבטל את החוזה ${from} — ${to}?`, { danger: true, confirmText: 'בטל חוזה' })) return
+    }
+
+    await supabase.from('chozim').delete().eq('id', choza.id)
+    toast('החוזה בוטל')
+    loadHistory(form.id)
     load(true)
   }
 
   async function remove(id, addr) {
     if (!await confirm(`למחוק את הדירה ${addr}?`, { danger: true })) return
+
+    // בדוק תשלומים לבעלים
+    const { data: tashlumim } = await supabase.from('tashlumim_baalim')
+      .select('id, status').eq('dirot_id', id)
+    if (tashlumim?.length > 0) {
+      const paid   = tashlumim.filter(t => t.status === 'שולם').length
+      const unpaid = tashlumim.length - paid
+      const paidNote = paid > 0 ? `\n⚠️ ${paid} מהם שולמו כבר!` : ''
+      const ok = await confirm(
+        `יש ${tashlumim.length} תשלומים לבעלים לדירה זו (${unpaid} לא שולמו${paidNote}).\n\nהאם למחוק גם אותם?`,
+        { danger: true, confirmText: 'מחק הכל', cancelText: 'ביטול' }
+      )
+      if (!ok) return
+      await supabase.from('tashlumim_baalim').delete().eq('dirot_id', id)
+    }
+
+    // מחיקת הדירה — השיבוצים ייסגרו ע"י CASCADE. הבחורים עצמם לא נמחקים.
     await supabase.from('dirot').delete().eq('id', id)
     logActivity('DELETE', 'dirot', id, addr)
     toast('נמחק')
@@ -424,10 +517,22 @@ export default function Dirot() {
         : '—'
     }},
     { key:'ola_schirut_chodshi', label:'שכירות', render:v=>currency(v) },
-    { key:'sofit_schirut', label:'סיום חוזה', render:v=>{
-      if (!v) return '—'
-      const d = daysUntil(v)
-      return <span className={d!==null&&d<=30&&d>=0?'text-amber-600 font-semibold':''}>{formatDate(v)}</span>
+    { key:'sofit_schirut', label:'סיום חוזה', render:(v,r)=>{
+      const dateEl = !v ? <span>—</span> : (() => {
+        const d = daysUntil(v)
+        return <span className={d!==null&&d<=30&&d>=0?'text-amber-600 font-semibold':''}>{formatDate(v)}</span>
+      })()
+      const cnt = chozimCountMap[r.id] ?? 0
+      return (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {dateEl}
+          {cnt > 1 && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap">
+              {cnt} חוזים
+            </span>
+          )}
+        </div>
+      )
     }},
     { key:'status',      label:'סטטוס', render:v=><Badge color={STATUS_COLORS[v]??'gray'}>{v??'—'}</Badge> },
     { key:'actions',     label:'', width:80, render:(_,row)=>(
@@ -654,7 +759,50 @@ export default function Dirot() {
           <FileUpload entityType="dirot" entityId={form.id} bucket="dirot-docs"/>
         )}
 
-        {/* ── Tab: היסטוריה ── */}
+        {/* ── Tab: היסטוריית חוזים ── */}
+        {activeTab==='chozim' && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-slate-700">חוזים לדירה זו</p>
+              {chozim.length > 1 && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                  {chozim.length} חוזים
+                </span>
+              )}
+            </div>
+            {chozim.length === 0
+              ? <p className="text-sm text-slate-400">אין חוזים רשומים עדיין (חוזים חדשים נרשמים אוטומטית)</p>
+              : (
+                <div className="space-y-2">
+                  {chozim.map((c, i) => (
+                    <div key={c.id ?? i} className={`flex items-center gap-3 p-3 rounded-xl border ${c.status==='פעיל' ? 'border-teal-200 bg-teal-50' : 'border-slate-200 bg-slate-50'}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge color={c.status==='פעיל'?'green':'gray'}>{c.status}</Badge>
+                          <span className="text-sm font-medium text-slate-700">
+                            {formatDate(c.tchilat_schirut)} — {formatDate(c.sofit_schirut)}
+                          </span>
+                          {c.mispar_chodashim && (
+                            <span className="text-xs text-slate-500">({c.mispar_chodashim} חודשים)</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-600 mt-0.5">{currency(c.ola_schirut_chodshi)}/חודש</p>
+                      </div>
+                      <button
+                        onClick={() => removeChoza(c)}
+                        className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                        title="בטל חוזה זה">
+                        <Trash2 size={14}/>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+          </div>
+        )}
+
+        {/* ── Tab: שיבוצים ── */}
         {activeTab==='history' && (
           <div>
             <p className="text-sm font-semibold text-slate-700 mb-3">שיבוצים בדירה זו</p>
