@@ -63,7 +63,7 @@ export default function Shibutzim() {
     const [{ data:s },{ data:b },{ data:d }] = await Promise.all([
       q,
       supabase.from('bochurim').select('id,shem,mishpacha').order('shem'),
-      supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi,mispar_mitot,payment_day').order('ktovet'),
+      supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi,mispar_mitot,payment_day,tchilat_schirut,sofit_schirut').order('ktovet'),
     ])
     setRows(s??[]); setBochurim(b??[]); setDirot(d??[])
     setLoading(false)
@@ -226,6 +226,14 @@ export default function Shibutzim() {
 
   async function save() {
     if (!form.bochurim_id || !form.dirot_id) { toast('יש לבחור בחור ודירה', 'error'); return }
+
+    // ── ולידציה: תאריך סיום לא יחרוג מסיום חוזה הדירה ──
+    const selDira = dirot.find(d => d.id === form.dirot_id)
+    if (selDira?.sofit_schirut && form.taarich_siyum && form.taarich_siyum > selDira.sofit_schirut) {
+      toast(`תאריך סיום חורג מסיום חוזה הדירה (${formatDate(selDira.sofit_schirut)})`, 'error')
+      return
+    }
+
     setSaving(true)
     const isNew = !form.id
 
@@ -433,6 +441,18 @@ export default function Shibutzim() {
             </Select>
           </FormField>
 
+          {/* תקופת חוזה הדירה */}
+          {(() => {
+            const sd = dirot.find(d => d.id === form.dirot_id)
+            if (!sd || (!sd.tchilat_schirut && !sd.sofit_schirut)) return <div/>
+            return (
+              <div className="col-span-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-blue-200 bg-blue-50 text-sm text-blue-700">
+                <span className="text-base">📅</span>
+                <span>חוזה דירה: <strong>{sd.tchilat_schirut ? formatDate(sd.tchilat_schirut) : '—'}</strong> עד <strong>{sd.sofit_schirut ? formatDate(sd.sofit_schirut) : '—'}</strong></span>
+              </div>
+            )
+          })()}
+
           {/* מידע מיטות */}
           {bedInfo && (
             <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm self-end mb-0.5 ${
@@ -495,7 +515,9 @@ export default function Shibutzim() {
               value={form.mispar_chodashim??''} onChange={set('mispar_chodashim')}/>
           </FormField>
           <FormField label="תאריך סיום">
-            <Input type="date" value={form.taarich_siyum??''} onChange={e=>setForm(f=>({...f,taarich_siyum:e.target.value}))}/>
+            <Input type="date" value={form.taarich_siyum??''}
+              max={dirot.find(d=>d.id===form.dirot_id)?.sofit_schirut ?? undefined}
+              onChange={e=>setForm(f=>({...f,taarich_siyum:e.target.value}))}/>
           </FormField>
         </div>
         <div className="mt-4">
