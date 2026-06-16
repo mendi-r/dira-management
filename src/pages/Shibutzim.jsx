@@ -405,6 +405,7 @@ export default function Shibutzim() {
     if (!await confirm(`למחוק שיבוץ זה${name ? ` של ${name}` : ''}?`, { danger: true })) return
 
     // בדוק שורות גבייה קשורות
+    let needsRecalc = false
     if (row?.bochurim_id && row?.dirot_id) {
       const { data: gviyaRows } = await supabase.from('gviya')
         .select('id, status')
@@ -422,11 +423,18 @@ export default function Shibutzim() {
           await supabase.from('gviya').delete()
             .eq('bochurim_id', row.bochurim_id)
             .eq('dirot_id', row.dirot_id)
+          needsRecalc = true
         }
       }
     }
 
     await supabase.from('shibutzim').delete().eq('id', id)
+
+    // עדכון חלוקה לשאר הבחורים בדירה — רק אם הגבייה נמחקה
+    if (needsRecalc && row?.dirot_id) {
+      await recalcBilling(row.dirot_id, row.taarich_tchila ?? new Date().toISOString().slice(0,10))
+    }
+
     toast('נמחק')
     load(true)
   }
@@ -441,10 +449,30 @@ export default function Shibutzim() {
     load(true)
   }
 
+  // חישוב מספר הבחורים הפעילים בכל דירה בחודש הנוכחי — לצורך הצגת חלק נכון בטבלה
+  const currentYM = new Date().toISOString().slice(0,7)
+  const [cY, cM] = currentYM.split('-').map(Number)
+  const cMonthStart = `${currentYM}-01`
+  const cMonthEnd = `${currentYM}-${String(new Date(cY, cM, 0).getDate()).padStart(2,'0')}`
+  const diraCounts = {}
+  rows.forEach(r => {
+    if (!r.dirot_id || !['פעיל', 'הסתיים'].includes(r.status)) return
+    const s = r.taarich_tchila ?? '1900-01-01'
+    const e = r.taarich_siyum  ?? '2999-12-31'
+    if (s <= cMonthEnd && e >= cMonthStart) {
+      diraCounts[r.dirot_id] = (diraCounts[r.dirot_id] ?? 0) + 1
+    }
+  })
+
   const columns = [
     { key:'bochurim', label:'בחור',  render:v => v ? `${v.shem??''} ${v.mishpacha??''}`.trim() : '—' },
     { key:'dirot',    label:'דירה',  render:v => v ? `${v.ktovet??''}, ${v.ir??''}` : '—' },
-    { key:'ola_lebach', label:'חלק ₪', render:v => currency(v) },
+    { key:'ola_lebach', label:'חלק ₪', render:(_, row) => {
+      const rent = Number(row.dirot?.ola_schirut_chodshi ?? 0)
+      const count = diraCounts[row.dirot_id] ?? 0
+      if (rent > 0 && count > 0) return currency(Math.round(rent / count))
+      return currency(row.ola_lebach)
+    }},
     { key:'taarich_tchila', label:'תחילה', render:v => formatDate(v) },
     { key:'taarich_siyum',  label:'סיום',  render:v => formatDate(v) },
     { key:'status', label:'סטטוס', render:v=><Badge color={STATUS_COLORS[v]??'gray'}>{v??'—'}</Badge> },

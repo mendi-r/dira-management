@@ -263,7 +263,8 @@ export default function Tashlumim() {
       })()}
 
       <p className="text-sm text-slate-400">{filtered.length} רשומות</p>
-      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}/>
+      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}
+        rowClassName={row => isOverdue(row) ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}/>
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? 'עריכת תשלום' : 'תשלום חדש לבעלים'} size="lg">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

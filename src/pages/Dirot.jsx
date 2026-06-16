@@ -75,6 +75,7 @@ export default function Dirot() {
   const [renewSaving, setRenewSaving] = useState(false)
   const [chozim, setChozim]           = useState([])
   const [chozimCountMap, setChozimCountMap] = useState({})
+  const [currentRentMap, setCurrentRentMap] = useState({})
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -83,7 +84,7 @@ export default function Dirot() {
     const [{ data }, { data: activeShibutzim }, { data: chozimAll }] = await Promise.all([
       q,
       supabase.from('shibutzim').select('dirot_id').eq('status','פעיל'),
-      supabase.from('chozim').select('dirot_id'),
+      supabase.from('chozim').select('dirot_id, tchilat_schirut, sofit_schirut, ola_schirut_chodshi'),
     ])
     const rows = data ?? []
     // ספירת משובצים פעילים לכל דירה
@@ -98,6 +99,17 @@ export default function Dirot() {
       if (c.dirot_id) cMap[c.dirot_id] = (cMap[c.dirot_id] ?? 0) + 1
     })
     setChozimCountMap(cMap)
+    // שכירות נכון לחודש הנוכחי — לפי חוזה פעיל
+    const currentYM = new Date().toISOString().slice(0,7)
+    const rMap = {}
+    ;(chozimAll ?? []).forEach(c => {
+      const from = c.tchilat_schirut?.slice(0,7)
+      const to   = c.sofit_schirut?.slice(0,7)
+      if (from && to && from <= currentYM && to >= currentYM && c.ola_schirut_chodshi) {
+        rMap[c.dirot_id] = c.ola_schirut_chodshi
+      }
+    })
+    setCurrentRentMap(rMap)
     setRows(rows)
     const warn = rows.filter(r => {
       const dc = r.sofit_schirut ? daysUntil(r.sofit_schirut) : null
@@ -380,6 +392,10 @@ export default function Dirot() {
     if (!tchilat_schirut || !mispar_chodashim || !ola_schirut_chodshi) {
       toast('יש למלא תאריך תחילה, מספר חודשים וסכום', 'error'); return
     }
+    // ולידציה: תאריך תחילה לא יכול להיות לפני סיום החוזה הנוכחי
+    if (form.sofit_schirut && tchilat_schirut < form.sofit_schirut) {
+      toast(`תאריך תחילה חייב להיות ${formatDate(form.sofit_schirut)} או אחריו`, 'error'); return
+    }
     const newEnd    = calcLeaseEnd(tchilat_schirut, mispar_chodashim)
     const newRent   = Number(ola_schirut_chodshi)
     const newMonths = Number(mispar_chodashim)
@@ -516,7 +532,13 @@ export default function Dirot() {
         ? <span className={free > 0 ? 'text-emerald-600 font-medium' : 'text-slate-500'}>{occ}/{total} ({free} פנויות)</span>
         : '—'
     }},
-    { key:'ola_schirut_chodshi', label:'שכירות', render:v=>currency(v) },
+    { key:'ola_schirut_chodshi', label:'שכירות', render:(v,r) => {
+      const cur = currentRentMap[r.id]
+      if (cur !== undefined && Number(cur) !== Number(v)) {
+        return <div><span>{currency(cur)}</span><span className="text-xs text-slate-400 block">(חוזה: {currency(v)})</span></div>
+      }
+      return currency(cur ?? v)
+    }},
     { key:'sofit_schirut', label:'סיום חוזה', render:(v,r)=>{
       const dateEl = !v ? <span>—</span> : (() => {
         const d = daysUntil(v)
@@ -849,6 +871,7 @@ export default function Dirot() {
           </div>
           <FormField label="תאריך תחילה חדש" required>
             <Input type="date" value={renewForm.tchilat_schirut}
+              min={form.sofit_schirut || undefined}
               onChange={e => {
                 const val = e.target.value
                 const newEnd = calcLeaseEnd(val, renewForm.mispar_chodashim)
