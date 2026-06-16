@@ -134,16 +134,21 @@ export default function Dirot() {
   async function save() {
     if (!form.ktovet) { toast('כתובת חובה', 'error'); return }
     setSaving(true)
+    const n = v => (v === '' || v === null || v === undefined) ? null : Number(v)
     const payload = { ...form }
-    if (!payload.tchilat_schirut) delete payload.tchilat_schirut
-    if (!payload.sofit_schirut)   delete payload.sofit_schirut
-    if (!payload.bituach_chadush) delete payload.bituach_chadush
-    if (payload.ola_schirut_chodshi) payload.ola_schirut_chodshi = Number(payload.ola_schirut_chodshi)
-    if (payload.arnona)           payload.arnona = Number(payload.arnona)
-    if (payload.mispar_chadarim)  payload.mispar_chadarim = Number(payload.mispar_chadarim)
-    if (payload.mispar_mitot)     payload.mispar_mitot = Number(payload.mispar_mitot)
-    if (payload.payment_day)      payload.payment_day = Number(payload.payment_day)
-    if (payload.mispar_chodashim) payload.mispar_chodashim = Number(payload.mispar_chodashim)
+    // dates — null if empty
+    if (!payload.tchilat_schirut) payload.tchilat_schirut = null
+    if (!payload.sofit_schirut)   payload.sofit_schirut   = null
+    if (!payload.bituach_chadush) payload.bituach_chadush = null
+    // numerics — empty string → null (never send "" to a numeric column)
+    payload.ola_schirut_chodshi = n(payload.ola_schirut_chodshi)
+    payload.arnona              = n(payload.arnona)
+    payload.mispar_chadarim     = n(payload.mispar_chadarim)
+    payload.mispar_mitot        = n(payload.mispar_mitot)
+    payload.mispar_sherutim     = n(payload.mispar_sherutim)
+    payload.mispar_miklachot    = n(payload.mispar_miklachot)
+    payload.payment_day         = n(payload.payment_day)
+    payload.mispar_chodashim    = n(payload.mispar_chodashim)
     delete payload.id; delete payload.created_at; delete payload.user_id
 
     const isNew = !form.id
@@ -240,7 +245,7 @@ export default function Dirot() {
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? form.ktovet||'דירה' : 'דירה חדשה'} size="xl">
         <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab}/>
-        <div style={{ minHeight: '440px' }} className="pt-1">
+        <div style={{ height: '460px', overflowY: 'auto' }} className="pt-1 pl-1 pr-1">
 
         {/* ── Tab: פרטי דירה ── */}
         {activeTab==='dira' && (

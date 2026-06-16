@@ -110,10 +110,13 @@ export default function Bochurim() {
   async function save() {
     if (!form.shem) { toast('שם חובה', 'error'); return }
     setSaving(true)
+    const n = v => (v === '' || v === null || v === undefined) ? null : Number(v)
     const payload = { ...form }
-    if (!payload.taarich_lida)  delete payload.taarich_lida
-    if (!payload.tokef_viza)    delete payload.tokef_viza
-    if (payload.amla_chodshit)  payload.amla_chodshit = Number(payload.amla_chodshit)
+    // dates — null if empty
+    if (!payload.taarich_lida) payload.taarich_lida = null
+    if (!payload.tokef_viza)   payload.tokef_viza   = null
+    // numerics
+    payload.amla_chodshit = n(payload.amla_chodshit)
     delete payload.id; delete payload.created_at; delete payload.user_id
 
     const isNew = !form.id
@@ -218,7 +221,7 @@ export default function Bochurim() {
         <Tabs tabs={TABS} active={activeTab} onChange={tab=>{setActiveTab(tab)}} />
         {/* fixed min-height so modal doesn't jump between tabs */}
 
-        <div style={{ minHeight: '440px' }} className="pt-1">
+        <div style={{ height: '460px', overflowY: 'auto' }} className="pt-1 pl-1 pr-1">
         {/* ── Tab: פרטים אישיים ── */}
         {activeTab==='personal' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
