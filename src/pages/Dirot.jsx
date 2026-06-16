@@ -158,6 +158,27 @@ export default function Dirot() {
     setSaving(false)
     if (error) { toast(error.message, 'error'); return }
     logActivity(isNew ? 'INSERT' : 'UPDATE', 'dirot', data.id, form.ktovet)
+
+    // עדכון רטרואקטיבי — כשסכום שכירות משתנה, עדכן שורות גבייה פתוחות
+    if (!isNew && payload.ola_schirut_chodshi) {
+      const { count: occupants } = await supabase
+        .from('shibutzim')
+        .select('*', { count: 'exact', head: true })
+        .eq('dirot_id', data.id)
+        .eq('status', 'פעיל')
+      if (occupants > 0) {
+        const newSplit = Math.round(payload.ola_schirut_chodshi / occupants)
+        const { data: updated } = await supabase
+          .from('gviya')
+          .update({ skhum: newSplit })
+          .eq('dirot_id', data.id)
+          .eq('status', 'לא שולם')
+          .select('id')
+        if (updated?.length > 0)
+          toast(`עודכנו ${updated.length} שורות גבייה ל-₪${newSplit.toLocaleString('he-IL')}/ח`)
+      }
+    }
+
     toast(isNew ? 'דירה נוספה' : 'עודכן')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
     load()

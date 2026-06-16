@@ -22,9 +22,19 @@ function exportCSV(data, filename) {
 
 const EMPTY = {
   bochurim_id:'', dirot_id:'', taarich_tchila:'', taarich_siyum:'',
+  mispar_chodashim:'',
   status:'פעיל', ola_lebach:'', heara:'',
 }
 const STATUS_COLORS = { פעיל:'green', הסתיים:'gray', בהמתנה:'yellow' }
+
+/** חישוב תאריך סיום: תחילה + חודשים = יום אחרון של החודש האחרון */
+function calcEndDate(startDate, months) {
+  if (!startDate || !months || Number(months) <= 0) return ''
+  const d = new Date(startDate + 'T12:00:00')
+  d.setMonth(d.getMonth() + Number(months))
+  d.setDate(0) // יום 0 = יום אחרון של החודש הקודם
+  return d.toISOString().slice(0, 10)
+}
 
 export default function Shibutzim() {
   const toast = useToast()
@@ -89,14 +99,24 @@ export default function Shibutzim() {
   function set(field) {
     return e => {
       const val = e.target.value
-      setForm(f => ({ ...f, [field]: val }))
+      setForm(f => {
+        const next = { ...f, [field]: val }
+        // חישוב אוטומטי של תאריך סיום מתאריך תחילה + מספר חודשים
+        if (field === 'taarich_tchila' || field === 'mispar_chodashim') {
+          const start  = field === 'taarich_tchila'   ? val : f.taarich_tchila
+          const months = field === 'mispar_chodashim' ? val : f.mispar_chodashim
+          const end = calcEndDate(start, months)
+          if (end) next.taarich_siyum = end
+        }
+        return next
+      })
       if (field === 'dirot_id') calcSplit(val, form.id)
     }
   }
 
   /** יצירת שורות גבייה חודשיות אוטומטית לכל חודש בתקופת השיבוץ */
   async function createMonthlyBilling(bocherImId, dirotId, start, end, ola) {
-    if (!start || !ola || !bocherImId) return
+    if (!start || !bocherImId) return
 
     // Get billing day from dira settings
     const dira = dirot.find(d => d.id === dirotId)
@@ -160,10 +180,10 @@ export default function Shibutzim() {
       : await supabase.from('shibutzim').update(payload).eq('id', form.id).select().single()
     if (error) { setSaving(false); toast(error.message, 'error'); return }
 
-    // auto-create monthly billing rows for new assignments
-    if (isNew && split) {
+    // יצירת שורות גבייה אוטומטית — תמיד כשיש תאריך התחלה
+    if (isNew && form.taarich_tchila) {
       await createMonthlyBilling(form.bochurim_id, form.dirot_id,
-        form.taarich_tchila, form.taarich_siyum, split)
+        form.taarich_tchila, form.taarich_siyum, split ?? 0)
     }
 
     logActivity(isNew?'INSERT':'UPDATE','shibutzim',data.id,'')
@@ -268,7 +288,11 @@ export default function Shibutzim() {
             </Select>
           </FormField>
           <FormField label="תאריך תחילה">
-            <Input type="date" value={form.taarich_tchila??''} onChange={e=>setForm(f=>({...f,taarich_tchila:e.target.value}))}/>
+            <Input type="date" value={form.taarich_tchila??''} onChange={set('taarich_tchila')}/>
+          </FormField>
+          <FormField label="מספר חודשים (לחישוב סיום)">
+            <Input type="number" min="1" max="60" placeholder="לדוגמה: 4"
+              value={form.mispar_chodashim??''} onChange={set('mispar_chodashim')}/>
           </FormField>
           <FormField label="תאריך סיום">
             <Input type="date" value={form.taarich_siyum??''} onChange={e=>setForm(f=>({...f,taarich_siyum:e.target.value}))}/>
