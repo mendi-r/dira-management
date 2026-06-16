@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PlusCircle, Edit2, Trash2, MapPin, ExternalLink, Download } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, MapPin, ExternalLink, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, calcLeaseEnd, daysUntil, currency, logActivity } from '../lib/utils'
 import { Table } from '../components/ui/Table'
@@ -57,6 +57,8 @@ export default function Dirot() {
   const [search, setSearch]     = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [alertFilter, setAlertFilter] = useState(searchParams.get('alert') ?? '')
+  const [freeBedFilter, setFreeBedFilter] = useState(searchParams.get('free_beds') === 'true')
+  const [occupantsMap, setOccupantsMap] = useState({})
   const [modal, setModal]       = useState(false)
   const [form, setForm]         = useState(EMPTY)
   const [activeTab, setActiveTab] = useState('dira')
@@ -68,11 +70,18 @@ export default function Dirot() {
     setLoading(true)
     let q = supabase.from('dirot').select('*').order('ktovet')
     if (statusFilter) q = q.eq('status', statusFilter)
-    const { data } = await q
+    const [{ data }, { data: activeShibutzim }] = await Promise.all([
+      q,
+      supabase.from('shibutzim').select('dirot_id').eq('status','פעיל'),
+    ])
     const rows = data ?? []
+    // ספירת משובצים פעילים לכל דירה
+    const oMap = {}
+    ;(activeShibutzim ?? []).forEach(s => {
+      if (s.dirot_id) oMap[s.dirot_id] = (oMap[s.dirot_id] ?? 0) + 1
+    })
+    setOccupantsMap(oMap)
     setRows(rows)
-    // contract + insurance alerts
-    const now = new Date()
     const warn = rows.filter(r => {
       const dc = r.sofit_schirut ? daysUntil(r.sofit_schirut) : null
       const db = r.bituach_chadush ? daysUntil(r.bituach_chadush) : null
@@ -99,7 +108,9 @@ export default function Dirot() {
     const alertMatch = !alertFilter ||
       (alertFilter === 'contract' && daysUntil(r.sofit_schirut) !== null && (daysUntil(r.sofit_schirut)??999) <= 30) ||
       (alertFilter === 'insurance' && daysUntil(r.bituach_chadush) !== null && (daysUntil(r.bituach_chadush)??999) <= 30)
-    return textMatch && alertMatch
+    const freeBedMatch = !freeBedFilter ||
+      ((r.mispar_mitot ?? 0) - (occupantsMap[r.id] ?? 0)) > 0
+    return textMatch && alertMatch && freeBedMatch
   })
 
   function openNew()  { setForm(EMPTY); setActiveTab('dira'); setHistory([]); setModal(true) }
@@ -179,9 +190,45 @@ export default function Dirot() {
       }
     }
 
+    // יצירת תשלומים לבעלים אוטומטית לדירה חדשה עם תאריך תחילה + חודשים + סכום
+    if (isNew && payload.tchilat_schirut && payload.mispar_chodashim && payload.ola_schirut_chodshi) {
+      await createOwnerPayments(data.id, payload.tchilat_schirut, payload.mispar_chodashim,
+        payload.ola_schirut_chodshi, payload.payment_day ?? 1)
+    }
+
     toast(isNew ? 'דירה נוספה' : 'עודכן')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
     load()
+  }
+
+  /** יצירת שורות תשלום לבעלים לכל חודשי השכירות */
+  async function createOwnerPayments(dirotId, start, months, skhum, payDay) {
+    // בדיקת שורות קיימות
+    const { count } = await supabase.from('tashlumim_baalim')
+      .select('*', { count:'exact', head:true })
+      .eq('dirot_id', dirotId)
+    if (count > 0) return // כבר קיימות שורות
+
+    const startD = new Date(start + 'T12:00:00')
+    const rows = []
+    for (let i = 0; i < Number(months); i++) {
+      const d = new Date(startD.getFullYear(), startD.getMonth() + i, 1)
+      const y = d.getFullYear(), m = d.getMonth() + 1
+      const daysInMonth = new Date(y, m, 0).getDate()
+      const day = Math.min(Number(payDay), daysInMonth)
+      rows.push({
+        dirot_id: dirotId,
+        skhum: Number(skhum),
+        taarich: `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+        chodesh: `${y}-${String(m).padStart(2,'0')}`,
+        payment_day: day,
+        status: 'לא שולם',
+      })
+    }
+    if (rows.length > 0) {
+      await supabase.from('tashlumim_baalim').insert(rows)
+      toast(`נוצרו ${rows.length} שורות תשלום לבעלים`)
+    }
   }
 
   async function remove(id, addr) {
@@ -203,7 +250,14 @@ export default function Dirot() {
     { key:'ir',          label:'עיר' },
     { key:'baalim_shem', label:'בעלים' },
     { key:'baalim_telefon1', label:'טלפון בעלים', render:v=><PhoneCell phone={v}/> },
-    { key:'mispar_mitot', label:'מיטות' },
+    { key:'mispar_mitot', label:'מיטות', render:(v,r) => {
+      const occ = occupantsMap[r.id] ?? 0
+      const total = v ?? 0
+      const free = total - occ
+      return total > 0
+        ? <span className={free > 0 ? 'text-emerald-600 font-medium' : 'text-slate-500'}>{occ}/{total} ({free} פנויות)</span>
+        : '—'
+    }},
     { key:'ola_schirut_chodshi', label:'שכירות', render:v=>currency(v) },
     { key:'sofit_schirut', label:'סיום חוזה', render:v=>{
       if (!v) return '—'
@@ -242,6 +296,18 @@ export default function Dirot() {
           <option value="ריק">ריק</option>
           <option value="לא_זמין">לא זמין</option>
         </select>
+        <button
+          onClick={() => setFreeBedFilter(f => !f)}
+          className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+            freeBedFilter
+              ? 'bg-teal-600 text-white border-teal-600'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'
+          }`}>
+          מיטות פנויות בלבד
+        </button>
+        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
+          <RefreshCw size={16}/>
+        </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({
             כתובת:r.ktovet, עיר:r.ir, בעלים:r.baalim_shem,

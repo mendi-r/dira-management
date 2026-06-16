@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PlusCircle, Edit2, Trash2, Download } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, currency, logActivity } from '../lib/utils'
 import { Table } from '../components/ui/Table'
@@ -235,6 +235,9 @@ export default function Shibutzim() {
           <option value="הסתיים">הסתיים</option>
           <option value="בהמתנה">בהמתנה</option>
         </select>
+        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
+          <RefreshCw size={16}/>
+        </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({
             בחור:`${r.bochurim?.shem??''} ${r.bochurim?.mishpacha??''}`,

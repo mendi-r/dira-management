@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Home, Shuffle, CreditCard, Wrench,
-  TrendingUp, TrendingDown, DollarSign, Bed
+  TrendingUp, TrendingDown, DollarSign, Bed, Banknote, RefreshCw
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, daysUntil, currency } from '../lib/utils'
@@ -31,80 +31,85 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function load() {
-      const [
-        { count: bochurimCount },
-        { count: dirotCount },
-        { data: shibutzim },
-        { data: dirot },
-        { data: bochurim },
-        { data: gviyaOpen },
-        { data: tachzukaOpen },
-        { data: expenses },
-        { data: gviyaMonth },
-      ] = await Promise.all([
-        supabase.from('bochurim').select('*', { count:'exact', head:true }),
-        supabase.from('dirot').select('*', { count:'exact', head:true }),
-        supabase.from('shibutzim')
-          .select('dirot_id, ola_lebach, bochurim(shem,mishpacha), dirot(ktovet,mispar_mitot)')
-          .eq('status', 'פעיל'),
-        supabase.from('dirot').select('id,ktovet,ir,mispar_mitot,ola_schirut_chodshi,sofit_schirut,bituach_chadush,status'),
-        supabase.from('bochurim').select('id,shem,mishpacha,tokef_viza'),
-        supabase.from('gviya').select('bochurim(shem,mishpacha,telefon),skhum,skhum_shulam,taarich,status')
-          .neq('status','שולם').order('taarich'),
-        supabase.from('tachzuka').select('id,teur,status,adifut,dirot(ktovet)')
-          .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
-        supabase.from('expenses').select('skhum,taarich').gte('taarich',
-          new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)),
-        supabase.from('gviya').select('skhum,skhum_shulam,is_amla').gte('taarich',
-          new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)),
-      ])
+  const load = useCallback(async () => {
+    setLoading(true)
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
 
-      const totalBeds    = (dirot??[]).reduce((s,d) => s + Number(d.mispar_mitot??0), 0)
-      const occupiedBeds = (shibutzim??[]).length
-      const freeBeds     = totalBeds - occupiedBeds
+    const [
+      { count: bochurimCount },
+      { count: dirotCount },
+      { data: shibutzim },
+      { data: dirot },
+      { data: allBochurim },
+      { data: gviyaOpen },
+      { data: tachzukaOpen },
+      { data: gviyaMonth },
+      { data: tashlumimMonth },
+    ] = await Promise.all([
+      supabase.from('bochurim').select('*', { count:'exact', head:true }),
+      supabase.from('dirot').select('*', { count:'exact', head:true }),
+      supabase.from('shibutzim')
+        .select('dirot_id, bochurim_id, ola_lebach, bochurim(shem,mishpacha), dirot(ktovet,mispar_mitot)')
+        .eq('status', 'פעיל'),
+      supabase.from('dirot').select('id,ktovet,ir,mispar_mitot,ola_schirut_chodshi,sofit_schirut,bituach_chadush,status'),
+      supabase.from('bochurim').select('id,shem,mishpacha').eq('status','פעיל'),
+      supabase.from('gviya').select('bochurim(shem,mishpacha,telefon),skhum,skhum_shulam,taarich,status')
+        .neq('status','שולם').order('taarich'),
+      supabase.from('tachzuka').select('id,teur,status,adifut,dirot(ktovet)')
+        .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
+      supabase.from('gviya').select('skhum,skhum_shulam').gte('taarich', monthStart),
+      supabase.from('tashlumim_baalim').select('skhum,skhum_shulam').gte('taarich', monthStart),
+    ])
 
-      const shibutzimByDira = {}
-      ;(shibutzim??[]).forEach(s => {
-        if (!shibutzimByDira[s.dirot_id]) shibutzimByDira[s.dirot_id] = 0
-        shibutzimByDira[s.dirot_id]++
-      })
-      const dirotStats = (dirot??[]).map(d => {
-        const n = shibutzimByDira[d.id] ?? 0
-        const total = d.mispar_mitot ?? 0
-        return { ...d, occupants: n, status_calc: n === 0 ? 'פנוי' : n >= total ? 'מלא' : 'חלקי' }
-      })
+    const totalBeds    = (dirot??[]).reduce((s,d) => s + Number(d.mispar_mitot??0), 0)
+    const occupiedBeds = (shibutzim??[]).length
+    const freeBeds     = totalBeds - occupiedBeds
 
-      const income       = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum_shulam??0), 0)
-      const commissions  = (gviyaMonth??[]).filter(g=>g.is_amla).reduce((s,g) => s + Number(g.skhum_shulam??0), 0)
-      const totalExpenses= (expenses??[]).reduce((s,e) => s + Number(e.skhum??0), 0)
-      const netProfit    = income - totalExpenses
+    // בחורים ללא שיבוץ פעיל
+    const activeIds = new Set((shibutzim??[]).map(s => s.bochurim_id))
+    const unassigned = (allBochurim??[]).filter(b => !activeIds.has(b.id))
 
-      const debtByBochur = {}
-      ;(gviyaOpen??[]).forEach(g => {
-        const key = g.bochurim ? `${g.bochurim.shem} ${g.bochurim.mishpacha}` : '—'
-        const debt = Number(g.skhum??0) - Number(g.skhum_shulam??0)
-        if (!debtByBochur[key]) debtByBochur[key] = { name:key, total: 0 }
-        debtByBochur[key].total += debt
-      })
-      const openDebts = Object.values(debtByBochur).filter(d => d.total > 0).sort((a,b) => b.total - a.total)
+    const shibutzimByDira = {}
+    ;(shibutzim??[]).forEach(s => {
+      if (!shibutzimByDira[s.dirot_id]) shibutzimByDira[s.dirot_id] = 0
+      shibutzimByDira[s.dirot_id]++
+    })
+    const dirotStats = (dirot??[]).map(d => {
+      const n = shibutzimByDira[d.id] ?? 0
+      const total = d.mispar_mitot ?? 0
+      return { ...d, occupants: n, status_calc: n === 0 ? 'פנוי' : n >= total ? 'מלא' : 'חלקי' }
+    })
 
-      const overdueCount     = (gviyaOpen??[]).filter(g => g.taarich && new Date(g.taarich) < new Date()).length
-      const contractEndCount = (dirot??[]).filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
+    // כספים — שני זרמים
+    const gviyaTotal     = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum_shulam??0), 0)
+    const tashlumimTotal = (tashlumimMonth??[]).reduce((s,t) => s + Number(t.skhum_shulam??0), 0)
+    const netProfit      = gviyaTotal - tashlumimTotal
 
-      setData({
-        bochurimCount, dirotCount, shibutzimCount: (shibutzim??[]).length,
-        totalBeds, occupiedBeds, freeBeds,
-        income, commissions, totalExpenses, netProfit,
-        dirotStats, openDebts,
-        tachzukaOpen: tachzukaOpen??[],
-        overdueCount, contractEndCount,
-      })
-      setLoading(false)
-    }
-    load()
+    const debtByBochur = {}
+    ;(gviyaOpen??[]).forEach(g => {
+      const key = g.bochurim ? `${g.bochurim.shem} ${g.bochurim.mishpacha}` : '—'
+      const debt = Number(g.skhum??0) - Number(g.skhum_shulam??0)
+      if (!debtByBochur[key]) debtByBochur[key] = { name:key, total: 0 }
+      debtByBochur[key].total += debt
+    })
+    const openDebts = Object.values(debtByBochur).filter(d => d.total > 0).sort((a,b) => b.total - a.total)
+
+    const overdueCount     = (gviyaOpen??[]).filter(g => g.taarich && new Date(g.taarich) < new Date()).length
+    const contractEndCount = (dirot??[]).filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
+
+    setData({
+      bochurimCount, dirotCount, shibutzimCount: (shibutzim??[]).length,
+      totalBeds, occupiedBeds, freeBeds,
+      unassigned,
+      gviyaTotal, tashlumimTotal, netProfit,
+      dirotStats, openDebts,
+      tachzukaOpen: tachzukaOpen??[],
+      overdueCount, contractEndCount,
+    })
+    setLoading(false)
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
@@ -113,16 +118,21 @@ export default function Dashboard() {
   )
 
   const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds,
-          income, commissions, totalExpenses, netProfit, dirotStats, openDebts,
+          unassigned, gviyaTotal, tashlumimTotal, netProfit, dirotStats, openDebts,
           tachzukaOpen, overdueCount, contractEndCount } = data
 
   return (
     <div className="space-y-6 fade-in">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">שלום, ברוך הבא 👋</h2>
-        <p className="text-slate-500 text-sm mt-0.5">
-          {new Date().toLocaleDateString('he-IL', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">שלום, ברוך הבא 👋</h2>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {new Date().toLocaleDateString('he-IL', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+          </p>
+        </div>
+        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן נתונים">
+          <RefreshCw size={16}/>
+        </button>
       </div>
 
       {alerts.length > 0 && (
@@ -163,9 +173,27 @@ export default function Dashboard() {
         <Clickable to="/shibutzim" params={{ status:'פעיל' }}>
           <StatCard label="שיבוצים פעילים" value={shibutzimCount} icon={Shuffle} color="green"/>
         </Clickable>
-        <Clickable to="/tachzuka" params={{ status:'פתוח' }}>
-          <StatCard label="קריאות תחזוקה" value={tachzukaOpen.length} icon={Wrench} color="amber"/>
+        <Clickable to="/bochurim" params={{ unassigned:'true' }}>
+          <StatCard label="ללא שיבוץ" value={unassigned.length} icon={Users} color="amber"
+            sub={unassigned.length > 0 ? unassigned.slice(0,2).map(b=>`${b.shem} ${b.mishpacha}`).join(', ') : 'כולם משובצים'}/>
         </Clickable>
+      </div>
+
+      {/* שורת כרטיסים שניה */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Clickable to="/dirot" params={{ free_beds:'true' }}>
+          <StatCard label="מיטות פנויות" value={freeBeds} icon={Bed} color="blue" sub={`מתוך ${totalBeds} סה״כ`}/>
+        </Clickable>
+        <Clickable to="/gviya">
+          <StatCard label="גבייה החודש" value={currency(gviyaTotal)} icon={CreditCard} color="green"/>
+        </Clickable>
+        <Clickable to="/tashlumim">
+          <StatCard label="לבעלים החודש" value={currency(tashlumimTotal)} icon={Banknote} color="red"/>
+        </Clickable>
+        <div>
+          <StatCard label="רווח נקי" value={currency(netProfit)} icon={TrendingUp}
+            color={netProfit >= 0 ? 'green' : 'red'}/>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -199,24 +227,26 @@ export default function Dashboard() {
           </CardBody>
         </Card>
 
-        {/* Finance */}
+        {/* Finance — שני זרמים */}
         <Card>
           <CardHeader title="כספים — החודש" action={<DollarSign size={18} className="text-slate-400"/>}/>
           <CardBody>
             <div className="space-y-2">
-              <Clickable to="/gviya" className="flex justify-between items-center p-1 rounded-lg hover:bg-slate-50">
-                <span className="text-sm text-slate-600">הכנסות (שולם)</span>
-                <span className="font-bold text-emerald-600">{currency(income)}</span>
+              <Clickable to="/gviya" className="flex justify-between items-center p-2 rounded-lg hover:bg-emerald-50">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={15} className="text-emerald-500"/>
+                  <span className="text-sm text-slate-600">גבייה מבחורים</span>
+                </div>
+                <span className="font-bold text-emerald-600">{currency(gviyaTotal)}</span>
               </Clickable>
-              <Clickable to="/gviya" params={{ is_amla:'true' }} className="flex justify-between items-center p-1 rounded-lg hover:bg-slate-50">
-                <span className="text-sm text-slate-600">עמלות</span>
-                <span className="font-semibold text-teal-600">{currency(commissions)}</span>
+              <Clickable to="/tashlumim" className="flex justify-between items-center p-2 rounded-lg hover:bg-red-50">
+                <div className="flex items-center gap-2">
+                  <Banknote size={15} className="text-red-500"/>
+                  <span className="text-sm text-slate-600">תשלומים לבעלים</span>
+                </div>
+                <span className="font-semibold text-red-500">{currency(tashlumimTotal)}</span>
               </Clickable>
-              <div className="flex justify-between items-center p-1">
-                <span className="text-sm text-slate-600">הוצאות</span>
-                <span className="font-semibold text-red-500">{currency(totalExpenses)}</span>
-              </div>
-              <div className="pt-2 border-t border-slate-100 flex justify-between items-center p-1">
+              <div className="pt-2 border-t border-slate-100 flex justify-between items-center p-2">
                 <span className="text-sm font-bold text-slate-700">רווח נקי</span>
                 <span className={`text-lg font-bold ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {currency(netProfit)}

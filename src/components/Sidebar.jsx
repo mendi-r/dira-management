@@ -3,17 +3,18 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Home, Shuffle, CreditCard,
   Wrench, Gauge, Settings, ChevronRight, Building2,
-  BarChart2, CalendarDays, History, ShieldCheck
+  BarChart2, CalendarDays, History, ShieldCheck, Banknote
 } from 'lucide-react'
 
 const links = [
-  { to: '/',           label: 'לוח בקרה',    icon: LayoutDashboard, end: true },
-  { to: '/bochurim',   label: 'בחורים',       icon: Users },
-  { to: '/dirot',      label: 'דירות',        icon: Home },
-  { to: '/shibutzim',  label: 'שיבוצים',      icon: Shuffle },
-  { to: '/gviya',      label: 'גבייה',        icon: CreditCard },
-  { to: '/tachzuka',   label: 'תחזוקה',       icon: Wrench },
-  { to: '/monim',      label: 'קריאות מונים', icon: Gauge },
+  { to: '/',            label: 'לוח בקרה',       icon: LayoutDashboard, end: true },
+  { to: '/bochurim',    label: 'בחורים',          icon: Users },
+  { to: '/dirot',       label: 'דירות',           icon: Home },
+  { to: '/shibutzim',   label: 'שיבוצים',         icon: Shuffle },
+  { to: '/gviya',       label: 'גבייה מבחורים',   icon: CreditCard },
+  { to: '/tashlumim',   label: 'תשלומים לבעלים',  icon: Banknote },
+  { to: '/tachzuka',    label: 'תחזוקה',          icon: Wrench },
+  { to: '/monim',       label: 'קריאות מונים',    icon: Gauge },
   { divider: true },
   { to: '/reports',    label: 'דוחות כספיים', icon: BarChart2 },
   { to: '/calendar',   label: 'לוח שנה',      icon: CalendarDays },

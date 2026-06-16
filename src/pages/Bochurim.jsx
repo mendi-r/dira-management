@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { UserPlus, Edit2, Trash2, Clock, Download } from 'lucide-react'
+import { UserPlus, Edit2, Trash2, Clock, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, today, daysUntil, currency, logActivity } from '../lib/utils'
 import { Table } from '../components/ui/Table'
@@ -196,6 +196,9 @@ export default function Bochurim() {
           <option value="לא_פעיל">לא פעיל</option>
           <option value="בהמתנה">בהמתנה</option>
         </select>
+        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
+          <RefreshCw size={16}/>
+        </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({
             שם:r.shem, משפחה:r.mishpacha, טלפון:r.telefon, אימייל:r.email,

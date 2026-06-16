@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PlusCircle, Edit2, Trash2, TrendingUp, MessageCircle, Download } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, TrendingUp, MessageCircle, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
 import { WhatsAppTemplate } from '../components/ui/ContactButtons'
@@ -181,6 +181,9 @@ export default function Gviya() {
         </select>
         <input type="month" value={monthFilter} onChange={e=>setMonthFilter(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400"/>
+        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
+          <RefreshCw size={16}/>
+        </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({
             בחור:`${r.bochurim?.shem??''} ${r.bochurim?.mishpacha??''}`,

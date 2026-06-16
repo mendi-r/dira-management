@@ -10,6 +10,7 @@ import Bochurim from './pages/Bochurim'
 import Dirot from './pages/Dirot'
 import Shibutzim from './pages/Shibutzim'
 import Gviya from './pages/Gviya'
+import Tashlumim from './pages/Tashlumim'
 import Tachzuka from './pages/Tachzuka'
 import Monim from './pages/Monim'
 import Hagdarot from './pages/Hagdarot'
@@ -38,7 +39,8 @@ function AppRoutes() {
         <Route path="bochurim"  element={<Bochurim />} />
         <Route path="dirot"     element={<Dirot />} />
         <Route path="shibutzim" element={<Shibutzim />} />
-        <Route path="gviya"     element={<Gviya />} />
+        <Route path="gviya"      element={<Gviya />} />
+        <Route path="tashlumim"  element={<Tashlumim />} />
         <Route path="tachzuka"  element={<Tachzuka />} />
         <Route path="monim"     element={<Monim />} />
         <Route path="hagdarot"  element={<Hagdarot />} />
