@@ -651,31 +651,27 @@ export default function Shibutzim() {
                 )}
               </div>
               {/* רשת חודשים */}
-              <div className="grid gap-3" style={{gridTemplateColumns: `repeat(${Math.min(capacityInfo.months.length, 4)}, 1fr)`}}>
+              <div className="grid gap-2" style={{gridTemplateColumns: `repeat(${Math.min(capacityInfo.months.length, 6)}, 1fr)`}}>
                 {capacityInfo.months.map(mo => {
                   const free = mo.total - mo.count
                   return (
-                    <div key={mo.ym} className={`rounded-2xl p-4 text-center border-2 ${
+                    <div key={mo.ym} className={`rounded-xl p-2.5 text-center border ${
                       mo.full
                         ? 'bg-red-100 border-red-300'
                         : free === 1
-                          ? 'bg-amber-50 border-amber-300'
-                          : 'bg-white border-emerald-300'
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-white border-emerald-200'
                     }`}>
-                      <div className={`text-sm font-bold mb-2 ${mo.full ? 'text-red-700' : free === 1 ? 'text-amber-700' : 'text-slate-700'}`}>
+                      <div className={`text-xs font-bold mb-1 ${mo.full ? 'text-red-700' : free === 1 ? 'text-amber-700' : 'text-slate-700'}`}>
                         {mo.label}
                       </div>
-                      <div className="text-3xl leading-none mb-2">
-                        {mo.full ? '🔴' : free === 1 ? '⚠️' : '✅'}
+                      <div className={`text-lg leading-none ${mo.full ? 'text-red-600' : free === 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {mo.full ? '🔴' : free === 1 ? '⚠️' : '✓'}
                       </div>
-                      <div className={`text-sm font-semibold ${mo.full ? 'text-red-600' : free === 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                        {mo.full ? 'מלאה' : `${free} מקום${free > 1 ? 'ות' : ''} פנוי${free > 1 ? 'ים' : ''}`}
+                      <div className={`text-xs mt-1 ${mo.full ? 'text-red-600' : free === 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {mo.full ? 'מלאה' : `${free} פנויות`}
                       </div>
-                      <div className={`text-xs mt-1.5 font-medium px-2 py-0.5 rounded-full inline-block ${
-                        mo.full ? 'bg-red-200 text-red-700' : free === 1 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {mo.count}/{mo.total} תפוסות
-                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">{mo.count}/{mo.total} תפוס</div>
                     </div>
                   )
                 })}
