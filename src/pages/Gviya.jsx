@@ -3,15 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, TrendingUp, MessageCircle, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
-
-function exportCSV(data, filename) {
-  if (!data.length) return
-  const headers = Object.keys(data[0]).join(',')
-  const rows = data.map(r => Object.values(r).map(v=>`"${v??''}"`).join(',')).join('\n')
-  const blob = new Blob(['﻿' + headers + '\n' + rows], { type:'text/csv;charset=utf-8;' })
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-  a.download = filename; a.click()
-}
 import { WhatsAppTemplate } from '../components/ui/ContactButtons'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
@@ -22,6 +13,15 @@ import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
 import AlertBanner from '../components/ui/AlertBanner'
 import { StatCard } from '../components/ui/Card'
 import { useToast } from '../components/ui/Toast'
+
+function exportCSV(data, filename) {
+  if (!data.length) return
+  const headers = Object.keys(data[0]).join(',')
+  const rows = data.map(r => Object.values(r).map(v=>`"${v??''}"`).join(',')).join('\n')
+  const blob = new Blob(['﻿' + headers + '\n' + rows], { type:'text/csv;charset=utf-8;' })
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+  a.download = filename; a.click()
+}
 
 const EMPTY = {
   bochurim_id:'', dirot_id:'', skhum:'', skhum_shulam:'0', taarich:'', chodesh:'',

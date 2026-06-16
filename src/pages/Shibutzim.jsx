@@ -3,6 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, currency, logActivity } from '../lib/utils'
+import { Table } from '../components/ui/Table'
+import SearchInput from '../components/ui/SearchInput'
+import Modal from '../components/ui/Modal'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
+import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
+import { useToast } from '../components/ui/Toast'
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -12,13 +19,6 @@ function exportCSV(data, filename) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
   a.download = filename; a.click()
 }
-import { Table } from '../components/ui/Table'
-import SearchInput from '../components/ui/SearchInput'
-import Modal from '../components/ui/Modal'
-import Button from '../components/ui/Button'
-import Badge from '../components/ui/Badge'
-import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
-import { useToast } from '../components/ui/Toast'
 
 const EMPTY = {
   bochurim_id:'', dirot_id:'', taarich_tchila:'', taarich_siyum:'',

@@ -218,7 +218,7 @@ export default function Bochurim() {
         <Tabs tabs={TABS} active={activeTab} onChange={tab=>{setActiveTab(tab)}} />
         {/* fixed min-height so modal doesn't jump between tabs */}
 
-        <div style={{ minHeight: '420px' }}>
+        <div style={{ minHeight: '440px' }} className="pt-1">
         {/* ── Tab: פרטים אישיים ── */}
         {activeTab==='personal' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -41,7 +41,7 @@ export default function Reports() {
     ] = await Promise.all([
       supabase.from('gviya').select('skhum,skhum_shulam,sug,bochurim(shem,mishpacha)').eq('chodesh', ym),
       supabase.from('gviya').select('skhum,skhum_shulam,chodesh,sug').gte('taarich',yearStart).lte('taarich',yearEnd),
-      supabase.from('expenses').select('skhum,sug,teur,taarich').eq('chodesh' /* won't match but we filter */,'x').gte('taarich',`${ym}-01`).lte('taarich',`${ym}-31`),
+      supabase.from('expenses').select('skhum,sug,teur,taarich').gte('taarich',`${ym}-01`).lte('taarich',`${ym}-31`),
       supabase.from('expenses').select('skhum,sug,taarich').gte('taarich',yearStart).lte('taarich',yearEnd),
       supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi'),
       supabase.from('shibutzim').select('dirot_id,ola_lebach,taarich_tchila,taarich_siyum').eq('status','פעיל'),

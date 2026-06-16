@@ -240,7 +240,7 @@ export default function Dirot() {
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? form.ktovet||'דירה' : 'דירה חדשה'} size="xl">
         <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab}/>
-        <div style={{ minHeight: '420px' }}>
+        <div style={{ minHeight: '440px' }} className="pt-1">
 
         {/* ── Tab: פרטי דירה ── */}
         {activeTab==='dira' && (
