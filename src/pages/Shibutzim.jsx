@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PlusCircle, Edit2, Trash2, Download, RefreshCw } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, Download, RefreshCw, AlertTriangle, Bed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, currency, logActivity } from '../lib/utils'
 import { Table } from '../components/ui/Table'
@@ -49,6 +49,7 @@ export default function Shibutzim() {
   const [form, setForm]         = useState(EMPTY)
   const [saving, setSaving]     = useState(false)
   const [autoSplit, setAutoSplit] = useState(null)
+  const [bedInfo, setBedInfo]   = useState(null)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -59,7 +60,7 @@ export default function Shibutzim() {
     const [{ data:s },{ data:b },{ data:d }] = await Promise.all([
       q,
       supabase.from('bochurim').select('id,shem,mishpacha').order('shem'),
-      supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi,payment_day').order('ktovet'),
+      supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi,mispar_mitot,payment_day').order('ktovet'),
     ])
     setRows(s??[]); setBochurim(b??[]); setDirot(d??[])
     setLoading(false)
@@ -67,20 +68,51 @@ export default function Shibutzim() {
 
   useEffect(() => { load() }, [load])
 
-  // חישוב אוטומטי של חלק לפי מספר משובצים בדירה
+  // חישוב אוטומטי של חלק + מידע מיטות
   async function calcSplit(dirotId, excludeId) {
-    if (!dirotId) return
+    if (!dirotId) { setAutoSplit(null); setBedInfo(null); return }
     const dira = dirot.find(d => d.id === dirotId)
-    if (!dira?.ola_schirut_chodshi) return
+    if (!dira) return
     const { count } = await supabase.from('shibutzim')
       .select('*', { count:'exact', head:true })
       .eq('dirot_id', dirotId)
       .eq('status', 'פעיל')
       .neq('id', excludeId ?? '00000000-0000-0000-0000-000000000000')
-    const total = (count ?? 0) + (form.id ? 0 : 1)
-    const split = total > 0 ? Math.round(Number(dira.ola_schirut_chodshi) / total) : 0
-    setAutoSplit({ total, split, rent: dira.ola_schirut_chodshi })
-    return split
+    const occupied = count ?? 0
+    const totalMitot = Number(dira.mispar_mitot ?? 0)
+    const free = Math.max(0, totalMitot - occupied)
+    setBedInfo({ total: totalMitot, occupied, free })
+    if (dira.ola_schirut_chodshi) {
+      const total = occupied + (form.id ? 0 : 1)
+      const split = total > 0 ? Math.round(Number(dira.ola_schirut_chodshi) / total) : 0
+      setAutoSplit({ total, split, rent: dira.ola_schirut_chodshi })
+      return split
+    }
+  }
+
+  // עדכון חלוקת שכירות לכל הבחורים בדירה מרגע ההצטרפות
+  async function recalcBilling(dirotId, fromDate) {
+    const dira = dirot.find(d => d.id === dirotId)
+    if (!dira?.ola_schirut_chodshi) return
+    const { data: active } = await supabase.from('shibutzim')
+      .select('id, bochurim_id')
+      .eq('dirot_id', dirotId)
+      .eq('status', 'פעיל')
+    if (!active?.length) return
+    const newShare = Math.round(Number(dira.ola_schirut_chodshi) / active.length)
+    const fromYM = fromDate ? fromDate.slice(0, 7) : null
+    for (const s of active) {
+      await supabase.from('shibutzim').update({ ola_lebach: newShare }).eq('id', s.id)
+      if (fromYM) {
+        await supabase.from('gviya')
+          .update({ skhum: newShare })
+          .eq('bochurim_id', s.bochurim_id)
+          .eq('dirot_id', dirotId)
+          .neq('status', 'שולם')
+          .gte('chodesh', fromYM)
+      }
+    }
+    toast(`חלוקה עודכנה: ${currency(newShare)}/חודש לכל בחור (${active.length} משובצים)`)
   }
 
   const filtered = rows.filter(r => {
@@ -89,11 +121,12 @@ export default function Shibutzim() {
     return `${name} ${addr}`.toLowerCase().includes(search.toLowerCase())
   })
 
-  function openNew()  { setForm(EMPTY); setAutoSplit(null); setModal(true) }
+  function openNew()  { setForm(EMPTY); setAutoSplit(null); setBedInfo(null); setModal(true) }
   function openEdit(r){
     setForm({ ...EMPTY, ...r, taarich_tchila: toInputDate(r.taarich_tchila), taarich_siyum: toInputDate(r.taarich_siyum) })
-    setAutoSplit(null)
+    setAutoSplit(null); setBedInfo(null)
     setModal(true)
+    if (r.dirot_id) calcSplit(r.dirot_id, r.id)
   }
 
   function set(field) {
@@ -167,23 +200,61 @@ export default function Shibutzim() {
   async function save() {
     if (!form.bochurim_id || !form.dirot_id) { toast('יש לבחור בחור ודירה', 'error'); return }
     setSaving(true)
-    const split = form.ola_lebach ? Number(form.ola_lebach) : (autoSplit?.split ?? null)
+    const isNew = !form.id
+
+    if (isNew) {
+      // ── בדיקת מיטות פנויות ──
+      const dira = dirot.find(d => d.id === form.dirot_id)
+      if (dira?.mispar_mitot) {
+        const { count: occupied } = await supabase.from('shibutzim')
+          .select('*', { count: 'exact', head: true })
+          .eq('dirot_id', form.dirot_id)
+          .eq('status', 'פעיל')
+        if ((occupied ?? 0) >= Number(dira.mispar_mitot)) {
+          toast(`אין מיטות פנויות — הדירה מלאה (${occupied}/${dira.mispar_mitot})`, 'error')
+          setSaving(false); return
+        }
+      }
+
+      // ── בדיקת שיבוץ כפול ──
+      const { data: existingShib } = await supabase.from('shibutzim')
+        .select('id, dirot!dirot_id(ktovet, ir)')
+        .eq('bochurim_id', form.bochurim_id)
+        .eq('status', 'פעיל')
+        .maybeSingle()
+      if (existingShib) {
+        const d = existingShib.dirot
+        const addr = d ? `${d.ktovet ?? ''}${d.ir ? ', ' + d.ir : ''}` : '—'
+        const go = window.confirm(
+          `בחור זה כבר משובץ בדירה "${addr}".\nלסיים את השיבוץ הנוכחי ולהעביר אותו לדירה החדשה?`
+        )
+        if (!go) { setSaving(false); return }
+        const endDate = form.taarich_tchila || new Date().toISOString().slice(0, 10)
+        await supabase.from('shibutzim').update({ status: 'הסתיים', taarich_siyum: endDate }).eq('id', existingShib.id)
+      }
+    }
+
+    // שמירת השיבוץ (olla_lebach יתעדכן ע"י recalcBilling)
+    const manualSplit = form.ola_lebach ? Number(form.ola_lebach) : null
     const payload = {
       bochurim_id: form.bochurim_id, dirot_id: form.dirot_id,
-      status: form.status, heara: form.heara, ola_lebach: split,
+      status: form.status, heara: form.heara, ola_lebach: manualSplit,
       taarich_tchila: form.taarich_tchila || null,
       taarich_siyum:  form.taarich_siyum  || null,
     }
-    const isNew = !form.id
     const { data, error } = isNew
       ? await supabase.from('shibutzim').insert(payload).select().single()
       : await supabase.from('shibutzim').update(payload).eq('id', form.id).select().single()
     if (error) { setSaving(false); toast(error.message, 'error'); return }
 
-    // יצירת שורות גבייה אוטומטית — תמיד כשיש תאריך התחלה
     if (isNew && form.taarich_tchila) {
+      // יצירת שורות גבייה (סכום זמני 0, יתעדכן ע"י recalcBilling)
       await createMonthlyBilling(form.bochurim_id, form.dirot_id,
-        form.taarich_tchila, form.taarich_siyum, split ?? 0)
+        form.taarich_tchila, form.taarich_siyum, 0)
+      // ── חלוקה דינמית: עדכון כל הבחורים בדירה ──
+      if (!manualSplit) {
+        await recalcBilling(form.dirot_id, form.taarich_tchila)
+      }
     }
 
     logActivity(isNew?'INSERT':'UPDATE','shibutzim',data.id,'')
@@ -257,38 +328,58 @@ export default function Shibutzim() {
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? 'עריכת שיבוץ' : 'שיבוץ חדש'}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+
+          {/* דירה קודם */}
+          <FormField label="דירה" required>
+            <Select value={form.dirot_id??''} onChange={e => { set('dirot_id')(e); calcSplit(e.target.value, form.id) }}>
+              <option value="">-- בחר דירה --</option>
+              {dirot.map(d=><option key={d.id} value={d.id}>{d.ktovet}{d.ir?`, ${d.ir}`:''} {d.ola_schirut_chodshi?`(${currency(d.ola_schirut_chodshi)}/ח)`:''}</option>)}
+            </Select>
+          </FormField>
+
+          {/* מידע מיטות */}
+          {bedInfo && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm self-end mb-0.5 ${
+              bedInfo.free <= 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              <Bed size={14} className="flex-shrink-0"/>
+              <span>
+                {bedInfo.free > 0
+                  ? `${bedInfo.free} מיטות פנויות מתוך ${bedInfo.total}`
+                  : `הדירה מלאה — ${bedInfo.occupied}/${bedInfo.total} מיטות`}
+              </span>
+              {bedInfo.free <= 0 && <AlertTriangle size={13} className="text-red-500"/>}
+            </div>
+          )}
+          {!bedInfo && <div/>}
+
+          {/* בחור */}
           <FormField label="בחור" required>
             <Select value={form.bochurim_id??''} onChange={set('bochurim_id')}>
               <option value="">-- בחר בחור --</option>
               {bochurim.map(b=><option key={b.id} value={b.id}>{b.shem} {b.mishpacha}</option>)}
             </Select>
           </FormField>
-          <FormField label="דירה" required>
-            <Select value={form.dirot_id??''} onChange={set('dirot_id')}>
-              <option value="">-- בחר דירה --</option>
-              {dirot.map(d=><option key={d.id} value={d.id}>{d.ktovet}{d.ir?`, ${d.ir}`:''} {d.ola_schirut_chodshi?`(${currency(d.ola_schirut_chodshi)}/ח)`:''}</option>)}
-            </Select>
-          </FormField>
 
-          {/* Auto-split display */}
-          {autoSplit && (
-            <div className="sm:col-span-2 bg-teal-50 border border-teal-200 rounded-xl p-3 text-sm">
-              <p className="text-teal-700 font-semibold">חלוקה אוטומטית</p>
+          {/* חלוקה אוטומטית */}
+          {autoSplit ? (
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-sm self-end mb-0.5">
+              <p className="text-teal-700 font-semibold text-xs">חלוקה אוטומטית</p>
               <p className="text-teal-600 mt-0.5">
-                שכירות {currency(autoSplit.rent)} ÷ {autoSplit.total} משובצים = <strong>{currency(autoSplit.split)}</strong> לבחור
+                {currency(autoSplit.rent)} ÷ {autoSplit.total} = <strong>{currency(autoSplit.split)}</strong>/ח׳
               </p>
             </div>
-          )}
+          ) : <div/>}
 
-          <FormField label="חלק מהשכירות (₪) — ריק = אוטומטי">
-            <Input type="number" min="0" value={form.ola_lebach??''} onChange={e=>setForm(f=>({...f,ola_lebach:e.target.value}))} placeholder={autoSplit?.split??''}/>
-          </FormField>
           <FormField label="סטטוס">
             <Select value={form.status??'פעיל'} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
               <option value="פעיל">פעיל</option>
               <option value="הסתיים">הסתיים</option>
               <option value="בהמתנה">בהמתנה</option>
             </Select>
+          </FormField>
+          <FormField label="חלק מהשכירות (₪) — ריק = אוטומטי">
+            <Input type="number" min="0" value={form.ola_lebach??''} onChange={e=>setForm(f=>({...f,ola_lebach:e.target.value}))} placeholder={autoSplit?.split??''}/>
           </FormField>
           <FormField label="תאריך תחילה">
             <Input type="date" value={form.taarich_tchila??''} onChange={set('taarich_tchila')}/>
@@ -306,7 +397,7 @@ export default function Shibutzim() {
         </div>
         {!form.id && (
           <p className="text-xs text-teal-600 mt-3 bg-teal-50 rounded-lg p-2">
-            ✓ שורות גבייה חודשיות יוצרו אוטומטית לכל חודש בתקופת השיבוץ
+            ✓ שורות גבייה חודשיות יוצרו אוטומטית · חלוקת שכירות תתעדכן לכל הבחורים בדירה
           </p>
         )}
         <div className="flex justify-end gap-3 mt-6">

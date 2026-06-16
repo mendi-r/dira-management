@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
 import { Table } from '../components/ui/Table'
@@ -224,6 +224,23 @@ export default function Tashlumim() {
         </Button>
         <Button icon={PlusCircle} onClick={openNew}>תשלום חדש</Button>
       </div>
+
+          {/* התראת תשלומים באיחור */}
+      {(() => {
+        const overdueRows = rows.filter(r => isOverdue(r))
+        if (!overdueRows.length) return null
+        return (
+          <button
+            onClick={() => setStatusFilter('לא שולם')}
+            className="w-full flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-right">
+            <AlertTriangle size={16} className="text-red-600 flex-shrink-0"/>
+            <div className="flex-1">
+              <span className="text-sm font-semibold text-red-700">יש {overdueRows.length} תשלומים באיחור</span>
+              <span className="text-xs text-red-500 mr-2">לחץ לסינון</span>
+            </div>
+          </button>
+        )
+      })()}
 
       <p className="text-sm text-slate-400">{filtered.length} רשומות</p>
       <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}

@@ -54,6 +54,8 @@ export default function Bochurim() {
   const [search, setSearch]     = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [alertFilter, setAlertFilter] = useState(searchParams.get('alert') ?? '')
+  const [unassignedFilter, setUnassignedFilter] = useState(searchParams.get('unassigned') === 'true')
+  const [assignedIds, setAssignedIds] = useState(new Set())
   const [modal, setModal]       = useState(false)
   const [form, setForm]         = useState(EMPTY)
   const [activeTab, setActiveTab] = useState('personal')
@@ -65,9 +67,13 @@ export default function Bochurim() {
     if (!silent) setLoading(true)
     let q = supabase.from('bochurim').select('*').order('shem')
     if (statusFilter) q = q.eq('status', statusFilter)
-    const { data } = await q
+    const [{ data }, { data: activeShib }] = await Promise.all([
+      q,
+      supabase.from('shibutzim').select('bochurim_id').eq('status', 'פעיל'),
+    ])
     const rows = data ?? []
     setRows(rows)
+    setAssignedIds(new Set((activeShib??[]).map(s => s.bochurim_id)))
     // התראות ויזה
     const now = new Date()
     const warn = rows.filter(r => {
@@ -94,7 +100,8 @@ export default function Bochurim() {
     const textMatch = `${r.shem??''} ${r.mishpacha??''} ${r.telefon??''} ${r.email??''} ${r.ir_megurim??''} ${r.mekorot??''} ${r.kvutza_yeshiva??''}`
       .toLowerCase().includes(search.toLowerCase())
     const alertMatch = alertFilter !== 'visa' || (daysUntil(r.tokef_viza) !== null && (daysUntil(r.tokef_viza) ?? 999) <= 30)
-    return textMatch && alertMatch
+    const unassignedMatch = !unassignedFilter || !assignedIds.has(r.id)
+    return textMatch && alertMatch && unassignedMatch
   })
 
   function openNew()  { setForm(EMPTY); setActiveTab('personal'); setHistory([]); setModal(true) }
@@ -208,12 +215,20 @@ export default function Bochurim() {
         </Button>
         <Button icon={UserPlus} onClick={openNew}>בחור חדש</Button>
       </div>
-      {alertFilter==='visa' && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">מסנן: ויזות קרובות לפקיעה</span>
-          <button onClick={()=>setAlertFilter('')} className="text-xs text-slate-400 hover:text-red-500">✕ נקה</button>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {alertFilter==='visa' && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">מסנן: ויזות קרובות לפקיעה</span>
+            <button onClick={()=>setAlertFilter('')} className="text-xs text-slate-400 hover:text-red-500">✕ נקה</button>
+          </div>
+        )}
+        {unassignedFilter && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">מסנן: ללא שיבוץ ({filtered.length})</span>
+            <button onClick={()=>setUnassignedFilter(false)} className="text-xs text-slate-400 hover:text-red-500">✕ נקה</button>
+          </div>
+        )}
+      </div>
 
       <p className="text-sm text-slate-400">{filtered.length} בחורים</p>
 

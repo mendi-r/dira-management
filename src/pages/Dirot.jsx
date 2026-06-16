@@ -347,7 +347,7 @@ export default function Dirot() {
             <FormField label="משכן"><Input value={form.mishkan??''} onChange={set('mishkan')}/></FormField>
             <FormField label="מזכיר"><Input value={form.mazkir??''} onChange={set('mazkir')}/></FormField>
             <FormField label="חדרים"><Input type="number" min="0" value={form.mispar_chadarim??''} onChange={set('mispar_chadarim')}/></FormField>
-            <FormField label="מיטות"><Input type="number" min="0" value={form.mispar_mitot??''} onChange={set('mispar_mitot')}/></FormField>
+            <FormField label="מיטות" required><Input type="number" min="0" value={form.mispar_mitot??''} onChange={set('mispar_mitot')}/></FormField>
             <FormField label="שירותים"><Input type="number" min="0" value={form.mispar_sherutim??''} onChange={set('mispar_sherutim')}/></FormField>
             <FormField label="מקלחות"><Input type="number" min="0" value={form.mispar_miklachot??''} onChange={set('mispar_miklachot')}/></FormField>
             <FormField label="מספר שעון מים"><Input value={form.sheon_mayim_num??''} onChange={set('sheon_mayim_num')}/></FormField>
@@ -408,10 +408,10 @@ export default function Dirot() {
         {/* ── Tab: חוזה ותשלום ── */}
         {activeTab==='chozeh' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-            <FormField label="עלות שכירות חודשית (₪)"><Input type="number" min="0" value={form.ola_schirut_chodshi??''} onChange={set('ola_schirut_chodshi')}/></FormField>
+            <FormField label="עלות שכירות חודשית (₪)" required><Input type="number" min="0" value={form.ola_schirut_chodshi??''} onChange={set('ola_schirut_chodshi')}/></FormField>
             <div/>
-            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-              <FormField label="תחילת שכירות">
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+              <FormField label="תחילת שכירות" required>
                 <DualDateField value={form.tchilat_schirut??''} onChange={v=>{ set('tchilat_schirut')({target:{value:v}}) }}/>
               </FormField>
               <FormField label="מספר חודשים">

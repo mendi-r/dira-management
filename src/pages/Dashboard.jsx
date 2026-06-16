@@ -79,6 +79,8 @@ export default function Dashboard() {
       const total = d.mispar_mitot ?? 0
       return { ...d, occupants: n, status_calc: n === 0 ? 'פנוי' : n >= total ? 'מלא' : 'חלקי' }
     })
+    // דירות עם לפחות מיטה פנויה אחת
+    const freeApartments = dirotStats.filter(d => d.occupants < Number(d.mispar_mitot ?? 0)).length
 
     // כספים — שני זרמים (סה"כ חיוב החודש, לא מה ששולם)
     const gviyaTotal     = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum??0), 0)
@@ -99,7 +101,7 @@ export default function Dashboard() {
 
     setData({
       bochurimCount, dirotCount, shibutzimCount: (shibutzim??[]).length,
-      totalBeds, occupiedBeds, freeBeds,
+      totalBeds, occupiedBeds, freeBeds, freeApartments,
       unassigned,
       gviyaTotal, tashlumimTotal, netProfit,
       dirotStats, openDebts,
@@ -117,7 +119,7 @@ export default function Dashboard() {
     </div>
   )
 
-  const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds,
+  const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds, freeApartments,
           unassigned, gviyaTotal, tashlumimTotal, netProfit, dirotStats, openDebts,
           tachzukaOpen, overdueCount, contractEndCount } = data
 
@@ -163,7 +165,7 @@ export default function Dashboard() {
       )}
 
       {/* Stats cards — all clickable */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Clickable to="/bochurim">
           <StatCard label="בחורים" value={bochurimCount??0} icon={Users} color="teal"/>
         </Clickable>
@@ -177,13 +179,14 @@ export default function Dashboard() {
           <StatCard label="ללא שיבוץ" value={unassigned.length} icon={Users} color="amber"
             sub={unassigned.length > 0 ? unassigned.slice(0,2).map(b=>`${b.shem} ${b.mishpacha}`).join(', ') : 'כולם משובצים'}/>
         </Clickable>
+        <Clickable to="/dirot" params={{ free_beds:'true' }}>
+          <StatCard label="דירות פנויות" value={freeApartments} icon={Bed} color="teal"
+            sub={`${freeBeds} מיטות פנויות`}/>
+        </Clickable>
       </div>
 
       {/* שורת כרטיסים שניה */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Clickable to="/dirot" params={{ free_beds:'true' }}>
-          <StatCard label="מיטות פנויות" value={freeBeds} icon={Bed} color="blue" sub={`מתוך ${totalBeds} סה״כ`}/>
-        </Clickable>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <Clickable to="/gviya">
           <StatCard label="גבייה החודש" value={currency(gviyaTotal)} icon={CreditCard} color="green"/>
         </Clickable>
