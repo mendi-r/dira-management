@@ -34,7 +34,7 @@ export function StatCard({ label, value, icon: Icon, color = 'teal', sub }) {
     purple: 'bg-purple-50 text-purple-600',
   }
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center gap-4">
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center gap-4 min-h-[88px]">
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${colors[color]}`}>
         <Icon size={22} />
       </div>

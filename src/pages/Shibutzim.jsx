@@ -256,7 +256,7 @@ export default function Shibutzim() {
       <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו שיבוצים" onRowClick={openEdit}/>
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? 'עריכת שיבוץ' : 'שיבוץ חדש'}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
           <FormField label="בחור" required>
             <Select value={form.bochurim_id??''} onChange={set('bochurim_id')}>
               <option value="">-- בחר בחור --</option>

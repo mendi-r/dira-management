@@ -33,7 +33,7 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
+    const currentMonth = new Date().toISOString().slice(0,7) // YYYY-MM
 
     const [
       { count: bochurimCount },
@@ -57,13 +57,13 @@ export default function Dashboard() {
         .neq('status','שולם').order('taarich'),
       supabase.from('tachzuka').select('id,teur,status,adifut,dirot(ktovet)')
         .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
-      supabase.from('gviya').select('skhum,skhum_shulam').gte('taarich', monthStart),
-      supabase.from('tashlumim_baalim').select('skhum,skhum_shulam').gte('taarich', monthStart),
+      supabase.from('gviya').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
+      supabase.from('tashlumim_baalim').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
     ])
 
     const totalBeds    = (dirot??[]).reduce((s,d) => s + Number(d.mispar_mitot??0), 0)
     const occupiedBeds = (shibutzim??[]).length
-    const freeBeds     = totalBeds - occupiedBeds
+    const freeBeds     = Math.max(0, totalBeds - occupiedBeds)
 
     // בחורים ללא שיבוץ פעיל
     const activeIds = new Set((shibutzim??[]).map(s => s.bochurim_id))
@@ -80,9 +80,9 @@ export default function Dashboard() {
       return { ...d, occupants: n, status_calc: n === 0 ? 'פנוי' : n >= total ? 'מלא' : 'חלקי' }
     })
 
-    // כספים — שני זרמים
-    const gviyaTotal     = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum_shulam??0), 0)
-    const tashlumimTotal = (tashlumimMonth??[]).reduce((s,t) => s + Number(t.skhum_shulam??0), 0)
+    // כספים — שני זרמים (סה"כ חיוב החודש, לא מה ששולם)
+    const gviyaTotal     = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum??0), 0)
+    const tashlumimTotal = (tashlumimMonth??[]).reduce((s,t) => s + Number(t.skhum??0), 0)
     const netProfit      = gviyaTotal - tashlumimTotal
 
     const debtByBochur = {}

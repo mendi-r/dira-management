@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, RefreshCw, Download } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
 import { Table } from '../components/ui/Table'
@@ -115,6 +115,28 @@ export default function Tashlumim() {
     toast('נמחק'); load()
   }
 
+  async function togglePaid(row) {
+    const isFullyPaid = row.status === 'שולם'
+    const { error } = await supabase.from('tashlumim_baalim').update(
+      isFullyPaid
+        ? { skhum_shulam: 0, status: 'לא שולם' }
+        : { skhum_shulam: row.skhum, status: 'שולם' }
+    ).eq('id', row.id)
+    if (error) { toast(error.message, 'error'); return }
+    toast(isFullyPaid ? 'סומן כלא שולם' : 'שולם ✓')
+    load()
+  }
+
+  function clearFilters() {
+    setSearch(''); setStatusFilter(''); setMonthFilter('')
+  }
+
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const prevMonth = (() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1)
+    return d.toISOString().slice(0, 7)
+  })()
+
   const columns = [
     { key:'dirot', label:'דירה', render:v => v ? `${v.ktovet??''}${v.ir?`, ${v.ir}`:''}` : '—' },
     { key:'dirot', label:'בעלים', render:v => v?.baalim_shem ?? '—' },
@@ -129,8 +151,14 @@ export default function Tashlumim() {
     }},
     { key:'taarich', label:'תאריך', render:v => formatDate(v) },
     { key:'status', label:'סטטוס', render:v => <Badge color={STATUS_COLORS[v]??'gray'}>{v??'—'}</Badge> },
-    { key:'actions', label:'', width:80, render:(_,row) => (
-      <div className="flex gap-1">
+    { key:'actions', label:'', width:110, render:(_,row) => (
+      <div className="flex gap-1 items-center">
+        <button
+          onClick={e=>{e.stopPropagation();togglePaid(row)}}
+          title={row.status==='שולם' ? 'סמן כלא שולם' : 'סמן כשולם'}
+          className={`p-1.5 rounded transition-colors ${row.status==='שולם' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-300 hover:text-emerald-500 hover:bg-emerald-50'}`}>
+          <CheckCircle size={15}/>
+        </button>
         <button onClick={e=>{e.stopPropagation();openEdit(row)}} className="p-1.5 rounded text-slate-400 hover:text-teal-600 hover:bg-teal-50"><Edit2 size={14}/></button>
         <button onClick={e=>{e.stopPropagation();remove(row.id)}} className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 size={14}/></button>
       </div>
@@ -148,7 +176,7 @@ export default function Tashlumim() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-48">
           <SearchInput value={search} onChange={setSearch} placeholder="כתובת דירה, בעלים..."/>
         </div>
@@ -161,6 +189,19 @@ export default function Tashlumim() {
         </select>
         <input type="month" value={monthFilter} onChange={e=>setMonthFilter(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400"/>
+        <button onClick={()=>setMonthFilter(currentMonth)}
+          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${monthFilter===currentMonth?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
+          חודש נוכחי
+        </button>
+        <button onClick={()=>setMonthFilter(prevMonth)}
+          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${monthFilter===prevMonth?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
+          חודש קודם
+        </button>
+        {(search || statusFilter || monthFilter) && (
+          <button onClick={clearFilters} className="px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
+            ✕ נקה סינון
+          </button>
+        )}
         <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
           <RefreshCw size={16}/>
         </button>

@@ -38,11 +38,12 @@ export function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-/** חישוב תאריך סיום שכירות */
+/** חישוב תאריך סיום שכירות — יום אחרון של חודש אחרון (לא תחילת הבא) */
 export function calcLeaseEnd(startDate, months) {
-  if (!startDate || !months) return null
-  const d = new Date(startDate)
-  d.setMonth(d.getMonth() + parseInt(months))
+  if (!startDate || !months || Number(months) <= 0) return null
+  const d = new Date(startDate + 'T12:00:00')
+  d.setMonth(d.getMonth() + Number(months))
+  d.setDate(0) // יום 0 = יום אחרון של החודש הקודם
   return d.toISOString().slice(0, 10)
 }
 

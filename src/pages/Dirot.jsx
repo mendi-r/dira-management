@@ -144,6 +144,10 @@ export default function Dirot() {
 
   async function save() {
     if (!form.ktovet) { toast('כתובת חובה', 'error'); return }
+    const isNewDira = !form.id
+    if (isNewDira && !form.mispar_mitot)         { toast('כמות מיטות חובה', 'error'); setActiveTab('dira'); return }
+    if (isNewDira && !form.ola_schirut_chodshi)  { toast('עלות שכירות חודשית חובה', 'error'); setActiveTab('chozeh'); return }
+    if (isNewDira && !form.tchilat_schirut)      { toast('תאריך תחילת חוזה חובה', 'error'); setActiveTab('chozeh'); return }
     setSaving(true)
     const n = v => (v === '' || v === null || v === undefined) ? null : Number(v)
     const payload = { ...form }
@@ -336,7 +340,7 @@ export default function Dirot() {
 
         {/* ── Tab: פרטי דירה ── */}
         {activeTab==='dira' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <FormField label="כתובת" required><Input value={form.ktovet??''} onChange={set('ktovet')} placeholder="רחוב הרצל 1"/></FormField>
             <FormField label="עיר"><Input value={form.ir??''} onChange={set('ir')} placeholder="ירושלים"/></FormField>
             <FormField label="משכן"><Input value={form.mishkan??''} onChange={set('mishkan')}/></FormField>
@@ -373,7 +377,7 @@ export default function Dirot() {
 
         {/* ── Tab: בעלים ── */}
         {activeTab==='baalim' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <FormField label="שם בעלים"><Input value={form.baalim_shem??''} onChange={set('baalim_shem')}/></FormField>
             <div/>
             <FormField label="טלפון בעלים 1">
@@ -402,7 +406,7 @@ export default function Dirot() {
 
         {/* ── Tab: חוזה ותשלום ── */}
         {activeTab==='chozeh' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <FormField label="עלות שכירות חודשית (₪)"><Input type="number" min="0" value={form.ola_schirut_chodshi??''} onChange={set('ola_schirut_chodshi')}/></FormField>
             <div/>
             <FormField label="תחילת שכירות">
@@ -434,7 +438,7 @@ export default function Dirot() {
 
         {/* ── Tab: ביטוח ── */}
         {activeTab==='bituach' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <FormField label="חברת ביטוח"><Input value={form.bituach_chevra??''} onChange={set('bituach_chevra')} placeholder="מגדל, הראל..."/></FormField>
             <FormField label="מספר פוליסה"><Input value={form.bituach_polisa??''} onChange={set('bituach_polisa')}/></FormField>
             <FormField label="תאריך חידוש">
