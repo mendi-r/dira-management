@@ -93,30 +93,56 @@ export default function Shibutzim() {
     }
   }
 
-  // עדכון חלוקת שכירות לכל הבחורים בדירה מרגע ההצטרפות
+  // עדכון חלוקת שכירות — חישוב לפי חודש: כמה בחורים פעילים בכל חודש בנפרד
   async function recalcBilling(dirotId, fromDate) {
     const { data: dira } = await supabase.from('dirot')
       .select('ola_schirut_chodshi').eq('id', dirotId).single()
     if (!dira?.ola_schirut_chodshi) return
-    const { data: active } = await supabase.from('shibutzim')
-      .select('id, bochurim_id')
+    const rent = Number(dira.ola_schirut_chodshi)
+
+    // כל השיבוצים בדירה (פעיל + הסתיים) — לצורך זיהוי חפיפה לפי חודש
+    const { data: shibutzim } = await supabase.from('shibutzim')
+      .select('bochurim_id, taarich_tchila, taarich_siyum, status')
       .eq('dirot_id', dirotId)
-      .eq('status', 'פעיל')
-    if (!active?.length) return
-    const newShare = Math.round(Number(dira.ola_schirut_chodshi) / active.length)
-    const fromYM = fromDate ? fromDate.slice(0, 7) : null
-    for (const s of active) {
-      await supabase.from('shibutzim').update({ ola_lebach: newShare }).eq('id', s.id)
-      if (fromYM) {
-        await supabase.from('gviya')
-          .update({ skhum: newShare })
-          .eq('bochurim_id', s.bochurim_id)
-          .eq('dirot_id', dirotId)
-          .neq('status', 'שולם')
-          .gte('chodesh', fromYM)
-      }
+      .in('status', ['פעיל', 'הסתיים'])
+    if (!shibutzim?.length) return
+
+    // שורות גבייה לא שולמות מ-fromDate ואילך
+    const fromYM = fromDate ? fromDate.slice(0, 7) : '2000-01'
+    const { data: gviyaRows } = await supabase.from('gviya')
+      .select('id, bochurim_id, chodesh')
+      .eq('dirot_id', dirotId)
+      .neq('status', 'שולם')
+      .gte('chodesh', fromYM)
+    if (!gviyaRows?.length) return
+
+    // עבור כל שורת גבייה — מצא כמה בחורים חופפים לאותו חודש
+    const updates = []
+    for (const gviya of gviyaRows) {
+      const ym = gviya.chodesh
+      const [y, m] = ym.split('-').map(Number)
+      const monthStart = `${ym}-01`
+      const monthEnd = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`
+      const count = shibutzim.filter(s => {
+        const sStart = s.taarich_tchila ?? '1900-01-01'
+        const sEnd   = s.taarich_siyum  ?? '2999-12-31'
+        return sStart <= monthEnd && sEnd >= monthStart
+      }).length
+      const split = count > 0 ? Math.round(rent / count) : rent
+      updates.push({ id: gviya.id, bochurimId: gviya.bochurim_id, skhum: split })
     }
-    toast(`חלוקה עודכנה: ${currency(newShare)}/חודש לכל בחור (${active.length} משובצים)`)
+
+    // עדכון כל השורות
+    for (const u of updates) {
+      await supabase.from('gviya').update({ skhum: u.skhum }).eq('id', u.id)
+    }
+
+    const uniqueSplits = [...new Set(updates.map(u => u.skhum))]
+    if (uniqueSplits.length === 1) {
+      toast(`חלוקה עודכנה: ${currency(uniqueSplits[0])}/חודש לכל בחור`)
+    } else {
+      toast(`חלוקה עודכנה לפי חודשים (${updates.length} שורות עודכנו)`)
+    }
   }
 
   const filtered = rows.filter(r => {
@@ -227,8 +253,12 @@ export default function Shibutzim() {
   async function save() {
     if (!form.bochurim_id || !form.dirot_id) { toast('יש לבחור בחור ודירה', 'error'); return }
 
-    // ── ולידציה: תאריך סיום לא יחרוג מסיום חוזה הדירה ──
+    // ── ולידציה: תאריכי שיבוץ בתוך טווח חוזה הדירה ──
     const selDira = dirot.find(d => d.id === form.dirot_id)
+    if (selDira?.tchilat_schirut && form.taarich_tchila && form.taarich_tchila < selDira.tchilat_schirut) {
+      toast(`תאריך תחילה מוקדם מתחילת חוזה הדירה (${formatDate(selDira.tchilat_schirut)})`, 'error')
+      return
+    }
     if (selDira?.sofit_schirut && form.taarich_siyum && form.taarich_siyum > selDira.sofit_schirut) {
       toast(`תאריך סיום חורג מסיום חוזה הדירה (${formatDate(selDira.sofit_schirut)})`, 'error')
       return
@@ -364,10 +394,38 @@ export default function Shibutzim() {
     if (!isNew && payload.status === 'הסתיים') {
       await recalcBilling(_dirotId, new Date().toISOString().slice(0, 10))
     }
+
+    // רענון נוסף אחרי סיום כל פעולות הגבייה
+    load(true)
   }
 
   async function remove(id) {
-    if (!await confirm('למחוק שיבוץ זה?', { danger: true })) return
+    const row = rows.find(r => r.id === id)
+    const name = row?.bochurim ? `${row.bochurim.shem??''} ${row.bochurim.mishpacha??''}`.trim() : ''
+    if (!await confirm(`למחוק שיבוץ זה${name ? ` של ${name}` : ''}?`, { danger: true })) return
+
+    // בדוק שורות גבייה קשורות
+    if (row?.bochurim_id && row?.dirot_id) {
+      const { data: gviyaRows } = await supabase.from('gviya')
+        .select('id, status')
+        .eq('bochurim_id', row.bochurim_id)
+        .eq('dirot_id', row.dirot_id)
+      if (gviyaRows?.length > 0) {
+        const paid   = gviyaRows.filter(r => r.status === 'שולם').length
+        const unpaid = gviyaRows.length - paid
+        const paidNote = paid > 0 ? `\n⚠️ ${paid} מהן כבר שולמו!` : ''
+        const delGviya = await confirm(
+          `יש ${gviyaRows.length} שורות גבייה לשיבוץ זה (${unpaid} לא שולמו${paidNote}).\n\nהאם למחוק גם את שורות הגבייה?`,
+          { danger: true, confirmText: 'מחק הכל', cancelText: 'שמור גבייה' }
+        )
+        if (delGviya) {
+          await supabase.from('gviya').delete()
+            .eq('bochurim_id', row.bochurim_id)
+            .eq('dirot_id', row.dirot_id)
+        }
+      }
+    }
+
     await supabase.from('shibutzim').delete().eq('id', id)
     toast('נמחק')
     load(true)
@@ -508,7 +566,10 @@ export default function Shibutzim() {
             <Input type="number" min="0" value={form.ola_lebach??''} onChange={e=>setForm(f=>({...f,ola_lebach:e.target.value}))} placeholder={autoSplit?.split??''}/>
           </FormField>
           <FormField label="תאריך תחילה">
-            <Input type="date" value={form.taarich_tchila??''} onChange={set('taarich_tchila')}/>
+            <Input type="date" value={form.taarich_tchila??''}
+              min={dirot.find(d=>d.id===form.dirot_id)?.tchilat_schirut ?? undefined}
+              max={dirot.find(d=>d.id===form.dirot_id)?.sofit_schirut ?? undefined}
+              onChange={set('taarich_tchila')}/>
           </FormField>
           <FormField label="מספר חודשים (לחישוב סיום)">
             <Input type="number" min="1" max="60" placeholder="לדוגמה: 4"
@@ -516,6 +577,7 @@ export default function Shibutzim() {
           </FormField>
           <FormField label="תאריך סיום">
             <Input type="date" value={form.taarich_siyum??''}
+              min={form.taarich_tchila || dirot.find(d=>d.id===form.dirot_id)?.tchilat_schirut || undefined}
               max={dirot.find(d=>d.id===form.dirot_id)?.sofit_schirut ?? undefined}
               onChange={e=>setForm(f=>({...f,taarich_siyum:e.target.value}))}/>
           </FormField>

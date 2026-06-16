@@ -229,13 +229,12 @@ export default function Dirot() {
         payload.ola_schirut_chodshi, payload.payment_day ?? 1)
     }
 
-    // הגדלת חודשי שכירות: יצירת תשלומים לחודשים החדשים
-    if (!isNew && payload.mispar_chodashim && originalMisparChodashim &&
-        payload.mispar_chodashim > Number(originalMisparChodashim) &&
-        payload.tchilat_schirut) {
+    // הגדלת חודשי שכירות: יצירת תשלומים לחודשים החדשים (גם אם לא היו בכלל)
+    if (!isNew && payload.mispar_chodashim && payload.tchilat_schirut &&
+        payload.mispar_chodashim > Number(originalMisparChodashim ?? 0)) {
       await addOwnerPaymentMonths(
         data.id, payload.tchilat_schirut,
-        Number(originalMisparChodashim), payload.mispar_chodashim,
+        Number(originalMisparChodashim ?? 0), payload.mispar_chodashim,
         payload.ola_schirut_chodshi, payload.payment_day ?? 1
       )
     }
