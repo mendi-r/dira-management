@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, Settings } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
@@ -62,6 +62,43 @@ export default function Hagdarot() {
     load()
   }
 
+  const [deleteModal, setDeleteModal] = useState(false)
+  const [deleteStep, setDeleteStep]   = useState(1) // 1=confirm, 2=type, 3=deleting
+  const [deleteInput, setDeleteInput] = useState('')
+  const DELETE_PHRASE = 'מחק הכל'
+
+  async function deleteAllData() {
+    setDeleteStep(3)
+    const tables = [
+      'gviya',
+      'tashlumim_baalim',
+      'shibutzim',
+      'tachzuka_pritim',
+      'tachzuka',
+      'riut',
+      'documents',
+      'activity_log',
+      'bochurim',
+      'dirot',
+      'vendors',
+      'hagdarot',
+    ]
+    const errors = []
+    for (const table of tables) {
+      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      if (error && !error.message.includes('does not exist')) errors.push(`${table}: ${error.message}`)
+    }
+    setDeleteModal(false)
+    setDeleteStep(1)
+    setDeleteInput('')
+    if (errors.length) {
+      toast(`שגיאות: ${errors.join(' | ')}`, 'error')
+    } else {
+      toast('כל הנתונים נמחקו בהצלחה')
+      load()
+    }
+  }
+
   const columns = [
     { key: 'mafteach', label: 'מפתח', render: v => <code className="px-1.5 py-0.5 bg-slate-100 rounded text-xs font-mono">{v}</code> },
     { key: 'erech',    label: 'ערך' },
@@ -111,6 +148,85 @@ export default function Hagdarot() {
       <p className="text-sm text-slate-400">{filtered.length} הגדרות</p>
 
       <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו הגדרות" onRowClick={openEdit} />
+
+      {/* Danger Zone */}
+      <div className="border border-red-200 rounded-2xl overflow-hidden">
+        <div className="bg-red-50 px-5 py-3 border-b border-red-200 flex items-center gap-2">
+          <AlertTriangle size={16} className="text-red-600"/>
+          <span className="font-semibold text-red-700 text-sm">אזור מסוכן</span>
+        </div>
+        <div className="p-5 flex items-center justify-between">
+          <div>
+            <p className="font-medium text-slate-800 text-sm">מחיקת כל הנתונים</p>
+            <p className="text-xs text-slate-500 mt-0.5">ימחקו לצמיתות: בחורים, דירות, שיבוצים, גבייה, תשלומים, תחזוקה, מונים וכל שאר הנתונים.</p>
+          </div>
+          <button
+            onClick={() => { setDeleteModal(true); setDeleteStep(1); setDeleteInput('') }}
+            className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex-shrink-0 mr-4">
+            מחק את כל הנתונים
+          </button>
+        </div>
+      </div>
+
+      {/* Delete All Modal */}
+      <Modal open={deleteModal} onClose={() => { if (deleteStep !== 3) { setDeleteModal(false); setDeleteStep(1); setDeleteInput('') } }} title="מחיקת כל הנתונים" size="md">
+        {deleteStep === 1 && (
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
+              <AlertTriangle size={20} className="text-red-600 flex-shrink-0 mt-0.5"/>
+              <div>
+                <p className="font-semibold text-red-800">פעולה בלתי הפיכה!</p>
+                <p className="text-sm text-red-700 mt-1">כל הנתונים ימחקו לצמיתות — בחורים, דירות, שיבוצים, גבייה, תשלומים לבעלים, תחזוקה, קריאות מונים, מסמכים, ויומן פעילות.</p>
+                <p className="text-sm text-red-700 mt-1 font-medium">לא ניתן לשחזר את הנתונים לאחר המחיקה!</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="secondary" onClick={() => setDeleteModal(false)}>ביטול</Button>
+              <button onClick={() => setDeleteStep(2)}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">
+                אני מבין, המשך
+              </button>
+            </div>
+          </div>
+        )}
+
+        {deleteStep === 2 && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              כדי לאשר, הקלד <span className="font-bold text-red-600 font-mono">{DELETE_PHRASE}</span> בשדה למטה:
+            </p>
+            <input
+              type="text"
+              value={deleteInput}
+              onChange={e => setDeleteInput(e.target.value)}
+              placeholder={DELETE_PHRASE}
+              dir="rtl"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-400"
+              autoFocus
+            />
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setDeleteModal(false)}>ביטול</Button>
+              <button
+                onClick={deleteAllData}
+                disabled={deleteInput !== DELETE_PHRASE}
+                className={`px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors ${
+                  deleteInput === DELETE_PHRASE
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-red-200 cursor-not-allowed'
+                }`}>
+                מחק את כל הנתונים
+              </button>
+            </div>
+          </div>
+        )}
+
+        {deleteStep === 3 && (
+          <div className="py-8 flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-red-500 border-t-transparent"/>
+            <p className="text-sm text-slate-600">מוחק נתונים... אנא המתן</p>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'עריכת הגדרה' : 'הגדרה חדשה'}>
         <div className="space-y-4">
