@@ -47,7 +47,7 @@ export default function Gviya() {
   const load = useCallback(async () => {
     setLoading(true)
     let q = supabase.from('gviya')
-      .select('*, bochurim(shem,mishpacha,telefon,amla_chodshit), dirot(ktovet,ir)')
+      .select('*, bochurim!bochurim_id(shem,mishpacha,telefon,amla_chodshit), dirot!dirot_id(ktovet,ir)')
       .order('taarich', { ascending: false })
     if (statusFilter) q = q.eq('status', statusFilter)
     if (monthFilter)  q = q.eq('chodesh', monthFilter)

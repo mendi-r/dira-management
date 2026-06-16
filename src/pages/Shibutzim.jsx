@@ -53,7 +53,7 @@ export default function Shibutzim() {
   const load = useCallback(async () => {
     setLoading(true)
     let q = supabase.from('shibutzim')
-      .select('*, bochurim(shem,mishpacha,telefon), dirot(ktovet,ir,ola_schirut_chodshi,mispar_mitot)')
+      .select('*, bochurim!bochurim_id(shem,mishpacha,telefon), dirot!dirot_id(ktovet,ir,ola_schirut_chodshi,mispar_mitot)')
       .order('taarich_tchila', { ascending: false })
     if (statusFilter) q = q.eq('status', statusFilter)
     const [{ data:s },{ data:b },{ data:d }] = await Promise.all([

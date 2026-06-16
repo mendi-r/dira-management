@@ -48,7 +48,7 @@ export default function CalendarPage() {
       { data: bochurim },
     ] = await Promise.all([
       supabase.from('shibutzim')
-        .select('id,taarich_siyum,bochurim(shem,mishpacha),dirot(ktovet)')
+        .select('id,taarich_siyum,bochurim!bochurim_id(shem,mishpacha),dirot!dirot_id(ktovet)')
         .gte('taarich_siyum', start).lte('taarich_siyum', end).eq('status','פעיל'),
       supabase.from('dirot')
         .select('id,ktovet,sofit_schirut,bituach_chadush'),

@@ -96,7 +96,7 @@ export default function Dirot() {
   async function loadHistory(dirotId) {
     const { data } = await supabase
       .from('shibutzim')
-      .select('*, bochurim(shem,mishpacha)')
+      .select('*, bochurim!bochurim_id(shem,mishpacha)')
       .eq('dirot_id', dirotId)
       .order('taarich_tchila', { ascending: false })
     setHistory(data ?? [])

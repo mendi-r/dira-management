@@ -49,11 +49,11 @@ export default function Dashboard() {
       supabase.from('bochurim').select('*', { count:'exact', head:true }),
       supabase.from('dirot').select('*', { count:'exact', head:true }),
       supabase.from('shibutzim')
-        .select('dirot_id, bochurim_id, ola_lebach, bochurim(shem,mishpacha), dirot(ktovet,mispar_mitot)')
+        .select('dirot_id, bochurim_id, ola_lebach, bochurim!bochurim_id(shem,mishpacha), dirot!dirot_id(ktovet,mispar_mitot)')
         .eq('status', 'פעיל'),
       supabase.from('dirot').select('id,ktovet,ir,mispar_mitot,ola_schirut_chodshi,sofit_schirut,bituach_chadush,status'),
       supabase.from('bochurim').select('id,shem,mishpacha').eq('status','פעיל'),
-      supabase.from('gviya').select('bochurim(shem,mishpacha,telefon),skhum,skhum_shulam,taarich,status')
+      supabase.from('gviya').select('bochurim!bochurim_id(shem,mishpacha,telefon),skhum,skhum_shulam,taarich,status')
         .neq('status','שולם').order('taarich'),
       supabase.from('tachzuka').select('id,teur,status,adifut,dirot(ktovet)')
         .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
