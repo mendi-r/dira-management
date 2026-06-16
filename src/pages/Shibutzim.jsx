@@ -27,6 +27,24 @@ const EMPTY = {
   status:'פעיל', ola_lebach:'', heara:'',
 }
 const STATUS_COLORS = { פעיל:'green', הסתיים:'gray', בהמתנה:'yellow' }
+const HE_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר']
+
+function hebrewMonthLabel(ym) {
+  const [y, m] = ym.split('-').map(Number)
+  return `${HE_MONTHS[m-1]} ${String(y).slice(2)}`
+}
+
+function getMonthsInRange(start, end) {
+  if (!start) return []
+  const months = []
+  const s = new Date(start.slice(0,7) + '-01T12:00:00')
+  const e = end ? new Date(end.slice(0,7) + '-01T12:00:00') : new Date(s)
+  while (s <= e) {
+    months.push(s.toISOString().slice(0,7))
+    s.setMonth(s.getMonth() + 1)
+  }
+  return months
+}
 
 /** חישוב תאריך סיום: תחילה + חודשים = יום אחרון של החודש האחרון */
 function calcEndDate(startDate, months) {
@@ -51,6 +69,7 @@ export default function Shibutzim() {
   const [saving, setSaving]     = useState(false)
   const [autoSplit, setAutoSplit]       = useState(null)
   const [bedInfo, setBedInfo]           = useState(null)
+  const [capacityInfo, setCapacityInfo] = useState(null) // תפוסה לפי חודש כשיש תאריכים
   const [originalSiyum, setOriginalSiyum] = useState(null)
   const [duplicateWarning, setDuplicateWarning] = useState(null) // { address } אם הבחור כבר משובץ
 
@@ -71,45 +90,56 @@ export default function Shibutzim() {
 
   useEffect(() => { load() }, [load])
 
-  // חישוב אוטומטי של חלק + מידע מיטות
-  // startDate/endDate — אם סופקו, מחשב חפיפה לפי תאריכים (אינדיקציה חיה)
+  // חישוב אוטומטי של חלק + מידע מיטות (לפי חודש אם יש תאריכים)
   async function calcSplit(dirotId, excludeId, startDate, endDate) {
-    if (!dirotId) { setAutoSplit(null); setBedInfo(null); return }
+    if (!dirotId) { setAutoSplit(null); setBedInfo(null); setCapacityInfo(null); return }
     const dira = dirot.find(d => d.id === dirotId)
     if (!dira) return
 
-    // מיטות: ספירת בחורים פעילים נוכחית (לצורך תצוגת מיטות)
-    const { count: activeCount } = await supabase.from('shibutzim')
-      .select('*', { count:'exact', head:true })
-      .eq('dirot_id', dirotId)
-      .eq('status', 'פעיל')
-      .neq('id', excludeId ?? '00000000-0000-0000-0000-000000000000')
     const totalMitot = Number(dira.mispar_mitot ?? 0)
-    const occupied = activeCount ?? 0
-    const free = Math.max(0, totalMitot - occupied)
-    setBedInfo({ total: totalMitot, occupied, free })
+
+    // שלוף את כל השיבוצים לדירה פעם אחת
+    const { data: allShibs } = await supabase.from('shibutzim')
+      .select('taarich_tchila, taarich_siyum, status')
+      .eq('dirot_id', dirotId)
+      .in('status', ['פעיל', 'הסתיים'])
+      .neq('id', excludeId ?? '00000000-0000-0000-0000-000000000000')
+
+    if (startDate && totalMitot > 0) {
+      // מצב עם תאריכים: הצג תפוסה לפי חודש
+      const months = getMonthsInRange(startDate, endDate || startDate)
+      const monthData = months.map(ym => {
+        const [y, m] = ym.split('-').map(Number)
+        const monthStart = `${ym}-01`
+        const monthEnd   = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`
+        const count = (allShibs ?? []).filter(s => {
+          const sS = s.taarich_tchila ?? '1900-01-01'
+          const sE = s.taarich_siyum  ?? '2999-12-31'
+          return sS <= monthEnd && sE >= monthStart
+        }).length
+        return { ym, label: hebrewMonthLabel(ym), count, full: count >= totalMitot, total: totalMitot }
+      })
+      setCapacityInfo({ total: totalMitot, months: monthData, hasFullMonth: monthData.some(m => m.full) })
+      setBedInfo(null)
+    } else {
+      // מצב ללא תאריכים: הצג תפוסה נוכחית פשוטה
+      const occupied = (allShibs ?? []).filter(s => s.status === 'פעיל').length
+      setBedInfo({ total: totalMitot, occupied, free: Math.max(0, totalMitot - occupied) })
+      setCapacityInfo(null)
+    }
 
     if (!dira.ola_schirut_chodshi) return
 
-    let overlapCount = occupied
-
-    // אם יש תאריך תחילה — חשב כמה בחורים חופפים לאותה תקופה
-    if (startDate) {
-      const { data: allShibs } = await supabase.from('shibutzim')
-        .select('taarich_tchila, taarich_siyum')
-        .eq('dirot_id', dirotId)
-        .in('status', ['פעיל', 'הסתיים'])
-        .neq('id', excludeId ?? '00000000-0000-0000-0000-000000000000')
-      if (allShibs) {
-        const assignEnd = endDate ?? '2999-12-31'
-        overlapCount = allShibs.filter(s => {
-          const sS = s.taarich_tchila ?? '1900-01-01'
-          const sE = s.taarich_siyum  ?? '2999-12-31'
-          return sS <= assignEnd && sE >= startDate
-        }).length
-      }
+    // חישוב חלוקת שכירות
+    let overlapCount = (allShibs ?? []).filter(s => s.status === 'פעיל').length
+    if (startDate && allShibs) {
+      const assignEnd = endDate ?? '2999-12-31'
+      overlapCount = allShibs.filter(s => {
+        const sS = s.taarich_tchila ?? '1900-01-01'
+        const sE = s.taarich_siyum  ?? '2999-12-31'
+        return sS <= assignEnd && sE >= startDate
+      }).length
     }
-
     const total = overlapCount + (form.id ? 0 : 1)
     const split = total > 0 ? Math.round(Number(dira.ola_schirut_chodshi) / total) : 0
     setAutoSplit({ total, split, rent: dira.ola_schirut_chodshi, dateAware: !!startDate })
@@ -175,16 +205,16 @@ export default function Shibutzim() {
   })
 
   function openNew()  {
-    setForm(EMPTY); setAutoSplit(null); setBedInfo(null)
+    setForm(EMPTY); setAutoSplit(null); setBedInfo(null); setCapacityInfo(null)
     setOriginalSiyum(null); setDuplicateWarning(null)
     setModal(true)
   }
   function openEdit(r){
     setForm({ ...EMPTY, ...r, taarich_tchila: toInputDate(r.taarich_tchila), taarich_siyum: toInputDate(r.taarich_siyum) })
-    setAutoSplit(null); setBedInfo(null); setDuplicateWarning(null)
+    setAutoSplit(null); setBedInfo(null); setCapacityInfo(null); setDuplicateWarning(null)
     setOriginalSiyum(r.taarich_siyum ? toInputDate(r.taarich_siyum) : null)
     setModal(true)
-    if (r.dirot_id) calcSplit(r.dirot_id, r.id)
+    if (r.dirot_id) calcSplit(r.dirot_id, r.id, r.taarich_tchila ? toInputDate(r.taarich_tchila) : null, r.taarich_siyum ? toInputDate(r.taarich_siyum) : null)
   }
 
   // בדיקת שיבוץ כפול בזמן אמת בבחירת בחור
@@ -305,16 +335,39 @@ export default function Shibutzim() {
     const isNew = !form.id
 
     if (isNew) {
-      // ── בדיקת מיטות פנויות ──
+      // ── בדיקת מיטות פנויות לפי חודש ──
       const dira = dirot.find(d => d.id === form.dirot_id)
       if (dira?.mispar_mitot) {
-        const { count: occupied } = await supabase.from('shibutzim')
-          .select('*', { count: 'exact', head: true })
+        const { data: existingShibs } = await supabase.from('shibutzim')
+          .select('taarich_tchila, taarich_siyum')
           .eq('dirot_id', form.dirot_id)
-          .eq('status', 'פעיל')
-        if ((occupied ?? 0) >= Number(dira.mispar_mitot)) {
-          toast(`אין מיטות פנויות — הדירה מלאה (${occupied}/${dira.mispar_mitot})`, 'error')
-          setSaving(false); return
+          .in('status', ['פעיל', 'הסתיים'])
+        const totalMitot = Number(dira.mispar_mitot)
+        if (form.taarich_tchila) {
+          // בדיקה לפי חודשים בטווח הנבחר
+          const rangeMonths = getMonthsInRange(form.taarich_tchila, form.taarich_siyum || form.taarich_tchila)
+          const fullMonth = rangeMonths.find(ym => {
+            const [y, m] = ym.split('-').map(Number)
+            const monthStart = `${ym}-01`
+            const monthEnd   = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`
+            const count = (existingShibs ?? []).filter(s => {
+              const sS = s.taarich_tchila ?? '1900-01-01'
+              const sE = s.taarich_siyum  ?? '2999-12-31'
+              return sS <= monthEnd && sE >= monthStart
+            }).length
+            return count >= totalMitot
+          })
+          if (fullMonth) {
+            toast(`הדירה מלאה בחודש ${hebrewMonthLabel(fullMonth)} — ${totalMitot}/${totalMitot} מיטות תפוסות`, 'error')
+            setSaving(false); return
+          }
+        } else {
+          // אין תאריך — בדיקת תפוסה נוכחית
+          const occupied = (existingShibs ?? []).filter(s => !s.taarich_siyum || s.taarich_siyum >= new Date().toISOString().slice(0,10)).length
+          if (occupied >= totalMitot) {
+            toast(`אין מיטות פנויות — הדירה מלאה (${occupied}/${totalMitot})`, 'error')
+            setSaving(false); return
+          }
         }
       }
 
@@ -576,8 +629,36 @@ export default function Shibutzim() {
             )
           })()}
 
-          {/* מידע מיטות */}
-          {bedInfo && (
+          {/* מידע מיטות — לפי חודש אם יש תאריכים, אחרת תפוסה נוכחית */}
+          {capacityInfo ? (
+            <div className={`col-span-2 rounded-xl border p-3 text-sm ${
+              capacityInfo.hasFullMonth ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Bed size={14} className="flex-shrink-0 text-slate-500"/>
+                <span className="font-semibold text-slate-700">תפוסה לפי חודש ({capacityInfo.total} מיטות)</span>
+                {capacityInfo.hasFullMonth && (
+                  <span className="flex items-center gap-1 text-red-600 font-medium text-xs">
+                    <AlertTriangle size={12}/> יש חודשים מלאים — לא ניתן לשבץ
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {capacityInfo.months.map(mo => (
+                  <div key={mo.ym} className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${
+                    mo.full
+                      ? 'bg-red-100 text-red-700 border-red-300'
+                      : mo.count >= mo.total - 1
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-green-50 text-green-700 border-green-200'
+                  }`}>
+                    {mo.label}: {mo.count}/{mo.total}
+                    {mo.full ? ' 🔴' : ' ✓'}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : bedInfo ? (
             <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm self-end mb-0.5 ${
               bedInfo.free <= 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-600'
             }`}>
@@ -589,8 +670,7 @@ export default function Shibutzim() {
               </span>
               {bedInfo.free <= 0 && <AlertTriangle size={13} className="text-red-500"/>}
             </div>
-          )}
-          {!bedInfo && <div/>}
+          ) : <div/>}
 
           {/* בחור */}
           <FormField label="בחור" required>
