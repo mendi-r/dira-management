@@ -85,7 +85,7 @@ export default function Hagdarot() {
     ]
     const errors = []
     for (const table of tables) {
-      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      const { error } = await supabase.from(table).delete().not('id', 'is', null)
       if (error && !error.message.includes('does not exist')) errors.push(`${table}: ${error.message}`)
     }
     setDeleteModal(false)
