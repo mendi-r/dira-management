@@ -111,7 +111,13 @@ export default function Dashboard() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    // רענון אוטומטי כשחוזרים לחלון
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">

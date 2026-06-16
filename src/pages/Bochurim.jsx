@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { UserPlus, Edit2, Trash2, Clock, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, today, daysUntil, currency, logActivity } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
 import Modal from '../components/ui/Modal'
@@ -55,6 +56,7 @@ export default function Bochurim() {
   const [statusFilter, setStatusFilter] = useState('')
   const [alertFilter, setAlertFilter] = useState(searchParams.get('alert') ?? '')
   const [unassignedFilter, setUnassignedFilter] = useState(searchParams.get('unassigned') === 'true')
+  const [assignedFilter, setAssignedFilter] = useState(false)
   const [assignedIds, setAssignedIds] = useState(new Set())
   const [modal, setModal]       = useState(false)
   const [form, setForm]         = useState(EMPTY)
@@ -101,7 +103,8 @@ export default function Bochurim() {
       .toLowerCase().includes(search.toLowerCase())
     const alertMatch = alertFilter !== 'visa' || (daysUntil(r.tokef_viza) !== null && (daysUntil(r.tokef_viza) ?? 999) <= 30)
     const unassignedMatch = !unassignedFilter || !assignedIds.has(r.id)
-    return textMatch && alertMatch && unassignedMatch
+    const assignedMatch   = !assignedFilter  ||  assignedIds.has(r.id)
+    return textMatch && alertMatch && unassignedMatch && assignedMatch
   })
 
   function openNew()  { setForm(EMPTY); setActiveTab('personal'); setHistory([]); setModal(true) }
@@ -139,7 +142,7 @@ export default function Bochurim() {
   }
 
   async function remove(id, name) {
-    if (!confirm(`למחוק את ${name}?`)) return
+    if (!await confirm(`למחוק את ${name}?`, { danger: true })) return
     await supabase.from('bochurim').delete().eq('id', id)
     logActivity('DELETE', 'bochurim', id, name)
     toast('נמחק')
@@ -204,19 +207,24 @@ export default function Bochurim() {
           <option value="בהמתנה">בהמתנה</option>
         </select>
         <button
-          onClick={() => setUnassignedFilter(f => !f)}
+          onClick={() => { setAssignedFilter(false); setUnassignedFilter(f => !f) }}
           className={`h-9 px-3 text-sm rounded-lg border transition-colors ${unassignedFilter ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'}`}>
           ללא שיבוץ
         </button>
-        {(search || statusFilter || alertFilter || unassignedFilter) && (
+        <button
+          onClick={() => { setUnassignedFilter(false); setAssignedFilter(f => !f) }}
+          className={`h-9 px-3 text-sm rounded-lg border transition-colors ${assignedFilter ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
+          משובץ
+        </button>
+        {(search || statusFilter || alertFilter || unassignedFilter || assignedFilter) && (
           <button
-            onClick={() => { setSearch(''); setStatusFilter(''); setAlertFilter(''); setUnassignedFilter(false) }}
+            onClick={() => { setSearch(''); setStatusFilter(''); setAlertFilter(''); setUnassignedFilter(false); setAssignedFilter(false) }}
             className="h-9 px-3 text-sm rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
             ✕ נקה סינון
           </button>
         )}
         <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
-          <RefreshCw size={16}/>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
         </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
 import Modal from '../components/ui/Modal'
@@ -56,7 +57,7 @@ export default function Hagdarot() {
   }
 
   async function remove(id) {
-    if (!confirm('למחוק הגדרה זו?')) return
+    if (!await confirm('למחוק הגדרה זו?', { danger: true })) return
     await supabase.from('hagdarot').delete().eq('id', id)
     toast('נמחק')
     load()

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { PlusCircle, Edit2, Trash2, Gauge, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, today } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
 import Modal from '../components/ui/Modal'
@@ -147,7 +148,7 @@ export default function Monim() {
   }
 
   async function remove(id) {
-    if (!confirm('למחוק קריאה זו?')) return
+    if (!await confirm('למחוק קריאה זו?', { danger: true })) return
     await supabase.from('riut').delete().eq('id', id)
     toast('נמחק')
     load(true)

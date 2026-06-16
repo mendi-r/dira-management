@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, Download, RefreshCw, AlertTriangle, Bed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, currency, logActivity } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
 import Modal from '../components/ui/Modal'
@@ -48,9 +49,10 @@ export default function Shibutzim() {
   const [modal, setModal]       = useState(false)
   const [form, setForm]         = useState(EMPTY)
   const [saving, setSaving]     = useState(false)
-  const [autoSplit, setAutoSplit] = useState(null)
-  const [bedInfo, setBedInfo]   = useState(null)
+  const [autoSplit, setAutoSplit]       = useState(null)
+  const [bedInfo, setBedInfo]           = useState(null)
   const [originalSiyum, setOriginalSiyum] = useState(null)
+  const [duplicateWarning, setDuplicateWarning] = useState(null) // { address } אם הבחור כבר משובץ
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -122,13 +124,35 @@ export default function Shibutzim() {
     return `${name} ${addr}`.toLowerCase().includes(search.toLowerCase())
   })
 
-  function openNew()  { setForm(EMPTY); setAutoSplit(null); setBedInfo(null); setOriginalSiyum(null); setModal(true) }
+  function openNew()  {
+    setForm(EMPTY); setAutoSplit(null); setBedInfo(null)
+    setOriginalSiyum(null); setDuplicateWarning(null)
+    setModal(true)
+  }
   function openEdit(r){
     setForm({ ...EMPTY, ...r, taarich_tchila: toInputDate(r.taarich_tchila), taarich_siyum: toInputDate(r.taarich_siyum) })
-    setAutoSplit(null); setBedInfo(null)
+    setAutoSplit(null); setBedInfo(null); setDuplicateWarning(null)
     setOriginalSiyum(r.taarich_siyum ? toInputDate(r.taarich_siyum) : null)
     setModal(true)
     if (r.dirot_id) calcSplit(r.dirot_id, r.id)
+  }
+
+  // בדיקת שיבוץ כפול בזמן אמת בבחירת בחור
+  async function onBochurChange(e) {
+    const bochurimId = e.target.value
+    setForm(f => ({ ...f, bochurim_id: bochurimId }))
+    setDuplicateWarning(null)
+    if (!bochurimId || form.id) return // בעריכה לא מציגים
+    const { data: existing } = await supabase.from('shibutzim')
+      .select('id, dirot!dirot_id(ktovet, ir)')
+      .eq('bochurim_id', bochurimId)
+      .eq('status', 'פעיל')
+      .maybeSingle()
+    if (existing) {
+      const d = existing.dirot
+      const addr = d ? `${d.ktovet ?? ''}${d.ir ? ', ' + d.ir : ''}` : '—'
+      setDuplicateWarning(addr)
+    }
   }
 
   function set(field) {
@@ -227,8 +251,9 @@ export default function Shibutzim() {
       if (existingShib) {
         const d = existingShib.dirot
         const addr = d ? `${d.ktovet ?? ''}${d.ir ? ', ' + d.ir : ''}` : '—'
-        const go = window.confirm(
-          `בחור זה כבר משובץ בדירה "${addr}".\nלסיים את השיבוץ הנוכחי ולהעביר אותו לדירה החדשה?`
+        const go = await confirm(
+          `בחור זה כבר משובץ בדירה "${addr}".\nלסיים את השיבוץ הנוכחי ולהעביר אותו לדירה החדשה?`,
+          { confirmText: 'העבר', cancelText: 'ביטול' }
         )
         if (!go) { setSaving(false); return }
         const endDate = form.taarich_tchila || new Date().toISOString().slice(0, 10)
@@ -239,10 +264,14 @@ export default function Shibutzim() {
     // שמירת השיבוץ (olla_lebach יתעדכן ע"י recalcBilling)
     const manualSplit = form.ola_lebach ? Number(form.ola_lebach) : null
     const payload = {
-      bochurim_id: form.bochurim_id, dirot_id: form.dirot_id,
-      status: form.status, heara: form.heara, ola_lebach: manualSplit,
-      taarich_tchila: form.taarich_tchila || null,
-      taarich_siyum:  form.taarich_siyum  || null,
+      bochurim_id:     form.bochurim_id,
+      dirot_id:        form.dirot_id,
+      status:          form.status,
+      heara:           form.heara,
+      ola_lebach:      manualSplit,
+      taarich_tchila:  form.taarich_tchila || null,
+      taarich_siyum:   form.taarich_siyum  || null,
+      mispar_chodashim: form.mispar_chodashim ? Number(form.mispar_chodashim) : null,
     }
     const { data, error } = isNew
       ? await supabase.from('shibutzim').insert(payload).select().single()
@@ -291,6 +320,11 @@ export default function Shibutzim() {
       }
     }
 
+    // אם עריכה וסטטוס שונה ל"הסתיים" — עדכן חלוקה לשאר הבחורים בדירה
+    if (!isNew && payload.status === 'הסתיים') {
+      await recalcBilling(form.dirot_id, new Date().toISOString().slice(0, 10))
+    }
+
     logActivity(isNew?'INSERT':'UPDATE','shibutzim',data.id,'')
     setSaving(false)
     toast(isNew ? 'שיבוץ נוסף' : 'עודכן')
@@ -299,17 +333,19 @@ export default function Shibutzim() {
   }
 
   async function remove(id) {
-    if (!confirm('למחוק שיבוץ זה?')) return
+    if (!await confirm('למחוק שיבוץ זה?', { danger: true })) return
     await supabase.from('shibutzim').delete().eq('id', id)
     toast('נמחק')
     load(true)
   }
 
   async function endAssignment(row) {
-    if (!confirm('לסיים שיבוץ זה?')) return
+    if (!await confirm('לסיים שיבוץ זה?', { confirmText: 'סיים' })) return
     const todayStr = new Date().toISOString().slice(0,10)
     await supabase.from('shibutzim').update({ status:'הסתיים', taarich_siyum: todayStr }).eq('id', row.id)
     toast('השיבוץ הסתיים')
+    // עדכון חלוקת שכירות לשאר הבחורים שנשארו בדירה
+    await recalcBilling(row.dirot_id, todayStr)
     load(true)
   }
 
@@ -341,7 +377,7 @@ export default function Shibutzim() {
           <option value="בהמתנה">בהמתנה</option>
         </select>
         <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
-          <RefreshCw size={16}/>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
         </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({
@@ -389,11 +425,21 @@ export default function Shibutzim() {
 
           {/* בחור */}
           <FormField label="בחור" required>
-            <Select value={form.bochurim_id??''} onChange={set('bochurim_id')}>
+            <Select value={form.bochurim_id??''} onChange={onBochurChange}>
               <option value="">-- בחר בחור --</option>
               {bochurim.map(b=><option key={b.id} value={b.id}>{b.shem} {b.mishpacha}</option>)}
             </Select>
           </FormField>
+
+          {/* אזהרת שיבוץ כפול */}
+          {duplicateWarning && (
+            <div className="col-span-2 flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <AlertTriangle size={15} className="text-amber-600 flex-shrink-0"/>
+              <span className="text-sm text-amber-700">
+                בחור זה כבר משובץ ב: <strong>{duplicateWarning}</strong> — שמירה תסיים את השיבוץ הנוכחי ותעביר אותו
+              </span>
+            </div>
+          )}
 
           {/* חלוקה אוטומטית */}
           {autoSplit ? (

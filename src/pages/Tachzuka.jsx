@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { PlusCircle, Edit2, Trash2, Wrench, Upload, Phone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, today, currency, logActivity } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
 import Modal from '../components/ui/Modal'
@@ -129,7 +130,7 @@ export default function Tachzuka() {
   }
 
   async function remove(id) {
-    if (!confirm('למחוק קריאה?')) return
+    if (!await confirm('למחוק קריאה?', { danger: true })) return
     await supabase.from('tachzuka').delete().eq('id', id)
     toast('נמחק'); load(true)
   }
@@ -339,7 +340,7 @@ export default function Tachzuka() {
                     <td className="py-2"><PhoneCell phone={v.telefon}/></td>
                     <td className="py-2">{currency(v.avg_cost)}</td>
                     <td className="py-2">
-                      <button onClick={async e=>{e.stopPropagation();if(!confirm('למחוק?'))return;await supabase.from('vendors').delete().eq('id',v.id);load()}}
+                      <button onClick={async e=>{e.stopPropagation();if(!await confirm('למחוק?',{danger:true}))return;await supabase.from('vendors').delete().eq('id',v.id);load()}}
                         className="text-red-400 hover:text-red-600"><Trash2 size={13}/></button>
                     </td>
                   </tr>

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, TrendingUp, MessageCircle, Download, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { WhatsAppTemplate } from '../components/ui/ContactButtons'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
@@ -104,7 +105,7 @@ export default function Gviya() {
   }
 
   async function remove(id) {
-    if (!confirm('למחוק?')) return
+    if (!await confirm('למחוק?', { danger: true })) return
     await supabase.from('gviya').delete().eq('id', id)
     toast('נמחק'); load(true)
   }
@@ -218,7 +219,7 @@ export default function Gviya() {
           </button>
         )}
         <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
-          <RefreshCw size={16}/>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
         </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, MapPin, ExternalLink, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, calcLeaseEnd, daysUntil, currency, logActivity } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { toHebrewDate } from '../components/ui/DualDateField'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
@@ -39,7 +40,7 @@ const EMPTY = {
   google_maps_link:'', drive_link:'',
 }
 
-const STATUS_COLORS = { פעיל:'green', ריק:'yellow', 'לא_זמין':'red' }
+const STATUS_COLORS = { פעיל:'green', ריק:'yellow', 'לא_זמין':'red', 'לא_פעיל':'gray' }
 
 const TABS = [
   { key:'dira',    label:'פרטי דירה' },
@@ -241,7 +242,7 @@ export default function Dirot() {
   }
 
   async function remove(id, addr) {
-    if (!confirm(`למחוק את הדירה ${addr}?`)) return
+    if (!await confirm(`למחוק את הדירה ${addr}?`, { danger: true })) return
     await supabase.from('dirot').delete().eq('id', id)
     logActivity('DELETE', 'dirot', id, addr)
     toast('נמחק')
@@ -284,18 +285,6 @@ export default function Dirot() {
 
   return (
     <div className="space-y-4 fade-in">
-      {alerts.length > 0 && (
-        <AlertBanner type="warning" title={`${alerts.length} חוזים/ביטוחים מסתיימים בקרוב`}>
-          <ul className="mt-1 space-y-0.5">
-            {alerts.map(r=>(
-              <li key={r.id} className="text-xs cursor-pointer hover:underline" onClick={()=>openEdit(r)}>
-                {r.ktovet} — חוזה: {formatDate(r.sofit_schirut)} | ביטוח: {formatDate(r.bituach_chadush)}
-              </li>
-            ))}
-          </ul>
-        </AlertBanner>
-      )}
-
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-48"><SearchInput value={search} onChange={setSearch} placeholder="כתובת, עיר, בעלים..."/></div>
         <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}
@@ -304,6 +293,7 @@ export default function Dirot() {
           <option value="פעיל">פעיל</option>
           <option value="ריק">ריק</option>
           <option value="לא_זמין">לא זמין</option>
+          <option value="לא_פעיל">לא פעיל</option>
         </select>
         <button
           onClick={() => setFreeBedFilter(f => !f)}
@@ -315,7 +305,7 @@ export default function Dirot() {
           מיטות פנויות בלבד
         </button>
         <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
-          <RefreshCw size={16}/>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
         </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({
@@ -337,7 +327,13 @@ export default function Dirot() {
       )}
 
       <p className="text-sm text-slate-400">{filtered.length} דירות</p>
-      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו דירות" onRowClick={openEdit}/>
+      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו דירות" onRowClick={openEdit}
+        rowClassName={row => {
+          const dc = row.sofit_schirut ? daysUntil(row.sofit_schirut) : null
+          const db = row.bituach_chadush ? daysUntil(row.bituach_chadush) : null
+          const isExpiring = (dc !== null && dc <= 30 && dc >= 0) || (db !== null && db <= 30 && db >= 0)
+          return isExpiring ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50'
+        }}/>
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? form.ktovet||'דירה' : 'דירה חדשה'} size="xl">
         <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab}/>
@@ -363,6 +359,7 @@ export default function Dirot() {
                 <option value="פעיל">פעיל</option>
                 <option value="ריק">ריק</option>
                 <option value="לא_זמין">לא זמין</option>
+                <option value="לא_פעיל">לא פעיל</option>
               </Select>
             </FormField>
             <FormField label="קישור Google Maps">

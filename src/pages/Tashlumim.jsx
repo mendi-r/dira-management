@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
 import Modal from '../components/ui/Modal'
@@ -115,7 +116,7 @@ export default function Tashlumim() {
   }
 
   async function remove(id) {
-    if (!confirm('למחוק תשלום זה?')) return
+    if (!await confirm('למחוק תשלום זה?', { danger: true })) return
     await supabase.from('tashlumim_baalim').delete().eq('id', id)
     toast('נמחק'); load(true)
   }
@@ -208,7 +209,7 @@ export default function Tashlumim() {
           </button>
         )}
         <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
-          <RefreshCw size={16}/>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
         </button>
         <Button variant="secondary" icon={Download}
           onClick={()=>exportCSV(filtered.map(r=>({

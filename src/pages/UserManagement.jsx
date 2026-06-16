@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Shield, UserPlus, Trash2, Edit2, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate } from '../lib/utils'
+import { confirm } from '../lib/confirm'
 import { Card, CardHeader, CardBody } from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
@@ -73,7 +74,7 @@ export default function UserManagement() {
   }
 
   async function removeUser(id) {
-    if (!confirm('להסיר את ההרשאות של משתמש זה?')) return
+    if (!await confirm('להסיר את ההרשאות של משתמש זה?', { danger: true })) return
     const { error } = await supabase.from('users_roles').delete().eq('id', id)
     if (error) { toast(error.message,'error'); return }
     toast('הוסר')
