@@ -83,7 +83,9 @@ export default function Dashboard() {
     const freeApartments = dirotStats.filter(d => d.occupants < Number(d.mispar_mitot ?? 0)).length
 
     // כספים — שני זרמים (סה"כ חיוב החודש, לא מה ששולם)
-    const gviyaTotal     = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum??0), 0)
+    const gviyaTotal       = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum??0), 0)
+    const gviyaCollected   = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum_shulam??0), 0)
+    const gviyaOutstanding = Math.max(0, gviyaTotal - gviyaCollected)
     const tashlumimTotal = (tashlumimMonth??[]).reduce((s,t) => s + Number(t.skhum??0), 0)
     const netProfit      = gviyaTotal - tashlumimTotal
 
@@ -103,10 +105,12 @@ export default function Dashboard() {
       bochurimCount, dirotCount, shibutzimCount: (shibutzim??[]).length,
       totalBeds, occupiedBeds, freeBeds, freeApartments,
       unassigned,
-      gviyaTotal, tashlumimTotal, netProfit,
+      gviyaTotal, gviyaCollected, gviyaOutstanding,
+      tashlumimTotal, netProfit,
       dirotStats, openDebts,
       tachzukaOpen: tachzukaOpen??[],
       overdueCount, contractEndCount,
+      currentMonth,
     })
     setLoading(false)
   }, [])
@@ -126,8 +130,9 @@ export default function Dashboard() {
   )
 
   const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds, freeApartments,
-          unassigned, gviyaTotal, tashlumimTotal, netProfit, dirotStats, openDebts,
-          tachzukaOpen, overdueCount, contractEndCount } = data
+          unassigned, gviyaTotal, gviyaCollected, gviyaOutstanding,
+          tashlumimTotal, netProfit, dirotStats, openDebts,
+          tachzukaOpen, overdueCount, contractEndCount, currentMonth } = data
 
   return (
     <div className="space-y-6 fade-in">
@@ -192,7 +197,7 @@ export default function Dashboard() {
 
       {/* שורת כרטיסים שניה */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <Clickable to="/gviya">
+        <Clickable to="/gviya" params={{ chodesh: currentMonth }}>
           <StatCard label="גבייה החודש" value={currency(gviyaTotal)} icon={CreditCard} color="green"/>
         </Clickable>
         <Clickable to="/tashlumim">
@@ -203,6 +208,37 @@ export default function Dashboard() {
             color={netProfit >= 0 ? 'green' : 'red'}/>
         </div>
       </div>
+
+      {/* כרטיס גבייה חודש נוכחי — פירוט גבוי/לא נגבה */}
+      <Card>
+        <CardHeader title={`גבייה מבחורים — ${new Date().toLocaleDateString('he-IL',{month:'long',year:'numeric'})}`}
+          action={<Clickable to="/gviya" params={{ chodesh: currentMonth }}><span className="text-xs text-teal-600 hover:underline cursor-pointer">הצג הכל</span></Clickable>}/>
+        <CardBody>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <Clickable to="/gviya" params={{ chodesh: currentMonth }} className="group">
+              <p className="text-2xl font-bold text-slate-700 group-hover:text-teal-600">{currency(gviyaTotal)}</p>
+              <p className="text-xs text-slate-400 mt-1">סה״כ לגביה</p>
+            </Clickable>
+            <Clickable to="/gviya" params={{ chodesh: currentMonth, status: 'שולם' }} className="group">
+              <p className="text-2xl font-bold text-emerald-600 group-hover:text-emerald-800">{currency(gviyaCollected)}</p>
+              <p className="text-xs text-slate-400 mt-1">נגבה בפועל</p>
+            </Clickable>
+            <Clickable to="/gviya" params={{ chodesh: currentMonth, status: 'לא שולם' }} className="group">
+              <p className={`text-2xl font-bold group-hover:opacity-80 ${gviyaOutstanding > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{currency(gviyaOutstanding)}</p>
+              <p className="text-xs text-slate-400 mt-1">לא נגבה</p>
+            </Clickable>
+          </div>
+          {gviyaTotal > 0 && (
+            <div className="mt-4">
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, Math.round(gviyaCollected / gviyaTotal * 100))}%` }}/>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 text-left">{Math.round(gviyaCollected / gviyaTotal * 100)}% נגבה</p>
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Beds — clickable sections */}

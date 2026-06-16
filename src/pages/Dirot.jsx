@@ -450,25 +450,86 @@ export default function Dirot() {
     load(true)
   }
 
-  /** שמירת עריכת חוזה */
+  /** שמירת עריכת חוזה — כולל סנכרון תנועות והתנגשויות */
   async function saveChoza() {
     if (!editChozaForm.tchilat_schirut || !editChozaForm.ola_schirut_chodshi) {
       toast('יש למלא תאריך תחילה וסכום', 'error'); return
     }
     setEditChozaSaving(true)
-    const newEnd = editChozaForm.mispar_chodashim
-      ? calcLeaseEnd(editChozaForm.tchilat_schirut, editChozaForm.mispar_chodashim)
+
+    const newStart  = editChozaForm.tchilat_schirut
+    const newMonths = editChozaForm.mispar_chodashim ? Number(editChozaForm.mispar_chodashim) : null
+    const newRent   = Number(editChozaForm.ola_schirut_chodshi)
+    const newEnd    = newMonths
+      ? calcLeaseEnd(newStart, newMonths)
       : editChozaForm.sofit_schirut || null
+
+    // ── בדיקת התנגשות עם חוזים אחרים ──
+    const { data: otherChozim } = await supabase.from('chozim')
+      .select('id, tchilat_schirut, sofit_schirut')
+      .eq('dirot_id', form.id)
+      .neq('id', editChoza.id)
+    const conflict = (otherChozim ?? []).some(c => {
+      const cS = c.tchilat_schirut ?? '1900-01-01'
+      const cE = c.sofit_schirut  ?? '2999-12-31'
+      return cS <= (newEnd ?? '2999-12-31') && cE >= newStart
+    })
+    if (conflict) {
+      toast('יש חפיפת תאריכים עם חוזה אחר — בדוק את התאריכים', 'error')
+      setEditChozaSaving(false); return
+    }
+
+    // ── טיפול בשינוי חודשי שכירות ↔ תנועות לבעלים ──
+    const oldMonths = Number(editChoza.mispar_chodashim ?? 0)
+    const oldEnd    = editChoza.sofit_schirut
+    if (newMonths && oldMonths && newStart) {
+      if (newMonths < oldMonths) {
+        const cutoffYM = monthAt(newStart, newMonths)
+        const endYM    = oldEnd ? oldEnd.slice(0,7) : '2999-12'
+        const { data: extraRows } = await supabase.from('tashlumim_baalim')
+          .select('id, status').eq('dirot_id', form.id)
+          .gte('chodesh', cutoffYM).lte('chodesh', endYM)
+        if (extraRows?.length > 0) {
+          const paid = extraRows.filter(r => r.status === 'שולם').length
+          const unpaid = extraRows.length - paid
+          const paidNote = paid > 0 ? `\n⚠️ ${paid} מהן שולמו כבר!` : ''
+          const ok = await confirm(
+            `הקיצור מ-${oldMonths} ל-${newMonths} חודשים ייסיר ${extraRows.length} תשלומים לבעלים (${unpaid} לא שולמו${paidNote}).\nהאם למחוק אותם?`,
+            { danger: true, confirmText: 'מחק', cancelText: 'ביטול' }
+          )
+          if (!ok) { setEditChozaSaving(false); return }
+          await supabase.from('tashlumim_baalim').delete()
+            .eq('dirot_id', form.id).gte('chodesh', cutoffYM).lte('chodesh', endYM)
+        }
+      } else if (newMonths > oldMonths) {
+        await addOwnerPaymentMonths(form.id, newStart, oldMonths, newMonths, newRent, form.payment_day ?? 1)
+      }
+    }
+
     const { error } = await supabase.from('chozim').update({
-      tchilat_schirut:    editChozaForm.tchilat_schirut,
-      sofit_schirut:      newEnd || null,
-      mispar_chodashim:   editChozaForm.mispar_chodashim ? Number(editChozaForm.mispar_chodashim) : null,
-      ola_schirut_chodshi: Number(editChozaForm.ola_schirut_chodshi),
-      status:             editChozaForm.status,
-      heara:              editChozaForm.heara || null,
+      tchilat_schirut:     newStart,
+      sofit_schirut:       newEnd || null,
+      mispar_chodashim:    newMonths,
+      ola_schirut_chodshi: newRent,
+      heara:               editChozaForm.heara || null,
     }).eq('id', editChoza.id)
     setEditChozaSaving(false)
     if (error) { toast(error.message, 'error'); return }
+
+    // ── סנכרון לדירה אם זה החוזה הפעיל הנוכחי ──
+    const todayStr = new Date().toISOString().slice(0,10)
+    if (newStart <= todayStr && (!newEnd || newEnd >= todayStr)) {
+      await supabase.from('dirot').update({
+        tchilat_schirut:     newStart,
+        sofit_schirut:       newEnd || null,
+        mispar_chodashim:    newMonths,
+        ola_schirut_chodshi: newRent,
+      }).eq('id', form.id)
+      setForm(f => ({ ...f, tchilat_schirut: newStart, sofit_schirut: newEnd ?? '', mispar_chodashim: newMonths ?? '', ola_schirut_chodshi: newRent }))
+      setOriginalRent(newRent)
+      setOriginalMisparChodashim(newMonths)
+    }
+
     toast('חוזה עודכן')
     setEditChoza(null)
     loadHistory(form.id)

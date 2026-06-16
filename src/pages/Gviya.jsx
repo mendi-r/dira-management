@@ -38,7 +38,7 @@ export default function Gviya() {
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? '')
-  const [monthFilter, setMonthFilter]   = useState('')
+  const [monthFilter, setMonthFilter]   = useState(searchParams.get('chodesh') ?? '')
   const [modal, setModal]       = useState(false)
   const [waModal, setWaModal]   = useState(null) // row for WA template
   const [form, setForm]         = useState(EMPTY)

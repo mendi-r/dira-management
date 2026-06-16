@@ -72,25 +72,48 @@ export default function Shibutzim() {
   useEffect(() => { load() }, [load])
 
   // חישוב אוטומטי של חלק + מידע מיטות
-  async function calcSplit(dirotId, excludeId) {
+  // startDate/endDate — אם סופקו, מחשב חפיפה לפי תאריכים (אינדיקציה חיה)
+  async function calcSplit(dirotId, excludeId, startDate, endDate) {
     if (!dirotId) { setAutoSplit(null); setBedInfo(null); return }
     const dira = dirot.find(d => d.id === dirotId)
     if (!dira) return
-    const { count } = await supabase.from('shibutzim')
+
+    // מיטות: ספירת בחורים פעילים נוכחית (לצורך תצוגת מיטות)
+    const { count: activeCount } = await supabase.from('shibutzim')
       .select('*', { count:'exact', head:true })
       .eq('dirot_id', dirotId)
       .eq('status', 'פעיל')
       .neq('id', excludeId ?? '00000000-0000-0000-0000-000000000000')
-    const occupied = count ?? 0
     const totalMitot = Number(dira.mispar_mitot ?? 0)
+    const occupied = activeCount ?? 0
     const free = Math.max(0, totalMitot - occupied)
     setBedInfo({ total: totalMitot, occupied, free })
-    if (dira.ola_schirut_chodshi) {
-      const total = occupied + (form.id ? 0 : 1)
-      const split = total > 0 ? Math.round(Number(dira.ola_schirut_chodshi) / total) : 0
-      setAutoSplit({ total, split, rent: dira.ola_schirut_chodshi })
-      return split
+
+    if (!dira.ola_schirut_chodshi) return
+
+    let overlapCount = occupied
+
+    // אם יש תאריך תחילה — חשב כמה בחורים חופפים לאותה תקופה
+    if (startDate) {
+      const { data: allShibs } = await supabase.from('shibutzim')
+        .select('taarich_tchila, taarich_siyum')
+        .eq('dirot_id', dirotId)
+        .in('status', ['פעיל', 'הסתיים'])
+        .neq('id', excludeId ?? '00000000-0000-0000-0000-000000000000')
+      if (allShibs) {
+        const assignEnd = endDate ?? '2999-12-31'
+        overlapCount = allShibs.filter(s => {
+          const sS = s.taarich_tchila ?? '1900-01-01'
+          const sE = s.taarich_siyum  ?? '2999-12-31'
+          return sS <= assignEnd && sE >= startDate
+        }).length
+      }
     }
+
+    const total = overlapCount + (form.id ? 0 : 1)
+    const split = total > 0 ? Math.round(Number(dira.ola_schirut_chodshi) / total) : 0
+    setAutoSplit({ total, split, rent: dira.ola_schirut_chodshi, dateAware: !!startDate })
+    return split
   }
 
   // עדכון חלוקת שכירות — חישוב לפי חודש: כמה בחורים פעילים בכל חודש בנפרד
@@ -185,9 +208,19 @@ export default function Shibutzim() {
   function set(field) {
     return e => {
       const val = e.target.value
+      // חשב תאריכים מעודכנים לצורך calcSplit
+      let newStart = form.taarich_tchila
+      let newEnd   = form.taarich_siyum
+      if (field === 'taarich_tchila') {
+        newStart = val
+        const end = calcEndDate(val, form.mispar_chodashim)
+        if (end) newEnd = end
+      } else if (field === 'mispar_chodashim') {
+        const end = calcEndDate(form.taarich_tchila, val)
+        if (end) newEnd = end
+      }
       setForm(f => {
         const next = { ...f, [field]: val }
-        // חישוב אוטומטי של תאריך סיום מתאריך תחילה + מספר חודשים
         if (field === 'taarich_tchila' || field === 'mispar_chodashim') {
           const start  = field === 'taarich_tchila'   ? val : f.taarich_tchila
           const months = field === 'mispar_chodashim' ? val : f.mispar_chodashim
@@ -196,7 +229,11 @@ export default function Shibutzim() {
         }
         return next
       })
-      if (field === 'dirot_id') calcSplit(val, form.id)
+      if (field === 'dirot_id') {
+        calcSplit(val, form.id, form.taarich_tchila, form.taarich_siyum)
+      } else if (['taarich_tchila', 'mispar_chodashim'].includes(field) && form.dirot_id) {
+        calcSplit(form.dirot_id, form.id, newStart, newEnd)
+      }
     }
   }
 
@@ -576,7 +613,9 @@ export default function Shibutzim() {
           {/* חלוקה אוטומטית */}
           {autoSplit ? (
             <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-sm self-end mb-0.5">
-              <p className="text-teal-700 font-semibold text-xs">חלוקה אוטומטית</p>
+              <p className="text-teal-700 font-semibold text-xs">
+                חלוקה אוטומטית{autoSplit.dateAware ? ' — לפי תאריכי השיבוץ' : ''}
+              </p>
               <p className="text-teal-600 mt-0.5">
                 {currency(autoSplit.rent)} ÷ {autoSplit.total} = <strong>{currency(autoSplit.split)}</strong>/ח׳
               </p>
@@ -607,7 +646,13 @@ export default function Shibutzim() {
             <Input type="date" value={form.taarich_siyum??''}
               min={form.taarich_tchila || dirot.find(d=>d.id===form.dirot_id)?.tchilat_schirut || undefined}
               max={dirot.find(d=>d.id===form.dirot_id)?.sofit_schirut ?? undefined}
-              onChange={e=>setForm(f=>({...f,taarich_siyum:e.target.value}))}/>
+              onChange={e => {
+                const val = e.target.value
+                setForm(f => ({ ...f, taarich_siyum: val }))
+                if (form.dirot_id && form.taarich_tchila) {
+                  calcSplit(form.dirot_id, form.id, form.taarich_tchila, val)
+                }
+              }}/>
           </FormField>
         </div>
         <div className="mt-4">
