@@ -230,9 +230,12 @@ CREATE TABLE IF NOT EXISTS users_roles (
 -- 2. הוספת עמודות חסרות לטבלאות קיימות (לשדרוג ממצב ישן)
 -- ============================================================
 
--- bochurim — עמודות שנוספו בגרסאות שונות
+-- bochurim — כל העמודות (בסיס + חדשות)
 ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS user_id               UUID REFERENCES auth.users(id) DEFAULT auth.uid();
+ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS shem                  TEXT;
 ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS mishpacha             TEXT;
+ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS telefon               TEXT;
+ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS email                 TEXT;
 ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS mispar_darkon         TEXT;
 ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS mekorot               TEXT;
 ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS taarich_lida          DATE;
@@ -253,6 +256,7 @@ ALTER TABLE bochurim ADD COLUMN IF NOT EXISTS heara                 TEXT;
 
 -- dirot
 ALTER TABLE dirot ADD COLUMN IF NOT EXISTS user_id               UUID REFERENCES auth.users(id) DEFAULT auth.uid();
+ALTER TABLE dirot ADD COLUMN IF NOT EXISTS ktovet               TEXT;
 ALTER TABLE dirot ADD COLUMN IF NOT EXISTS ir                    TEXT;
 ALTER TABLE dirot ADD COLUMN IF NOT EXISTS mishkan               TEXT;
 ALTER TABLE dirot ADD COLUMN IF NOT EXISTS mazkir                TEXT;
@@ -288,31 +292,44 @@ ALTER TABLE dirot ADD COLUMN IF NOT EXISTS google_maps_link      TEXT;
 ALTER TABLE dirot ADD COLUMN IF NOT EXISTS drive_link            TEXT;
 
 -- shibutzim
-ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS user_id       UUID REFERENCES auth.users(id) DEFAULT auth.uid();
-ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS ola_lebach    NUMERIC(10,2);
-ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS heara         TEXT;
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS user_id         UUID REFERENCES auth.users(id) DEFAULT auth.uid();
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS bochurim_id     UUID;
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS dirot_id        UUID;
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS taarich_tchila  DATE;
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS taarich_siyum   DATE;
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS status          TEXT DEFAULT 'פעיל';
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS ola_lebach      NUMERIC(10,2);
+ALTER TABLE shibutzim ADD COLUMN IF NOT EXISTS heara           TEXT;
 
 -- gviya
 ALTER TABLE gviya ADD COLUMN IF NOT EXISTS user_id         UUID REFERENCES auth.users(id) DEFAULT auth.uid();
-ALTER TABLE gviya ADD COLUMN IF NOT EXISTS dirot_id        UUID REFERENCES dirot(id) ON DELETE SET NULL;
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS bochurim_id     UUID;
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS dirot_id        UUID;
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS skhum           NUMERIC(10,2);
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS skhum_shulam    NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS taarich         DATE;
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS chodesh         TEXT;
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS sug             TEXT DEFAULT 'שכר דירה';
 ALTER TABLE gviya ADD COLUMN IF NOT EXISTS payment_method  TEXT;
 ALTER TABLE gviya ADD COLUMN IF NOT EXISTS billing_day     INTEGER;
-ALTER TABLE gviya ADD COLUMN IF NOT EXISTS chodesh         TEXT;
 ALTER TABLE gviya ADD COLUMN IF NOT EXISTS is_amla         BOOLEAN DEFAULT FALSE;
-ALTER TABLE gviya ADD COLUMN IF NOT EXISTS skhum_shulam   NUMERIC(10,2) DEFAULT 0;
-ALTER TABLE gviya ADD COLUMN IF NOT EXISTS heara           TEXT;
 ALTER TABLE gviya ADD COLUMN IF NOT EXISTS status          TEXT DEFAULT 'לא שולם';
+ALTER TABLE gviya ADD COLUMN IF NOT EXISTS heara           TEXT;
 
 -- tachzuka
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS user_id       UUID REFERENCES auth.users(id) DEFAULT auth.uid();
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS makom_bedira  TEXT;
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS assigned_to   TEXT;
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS adifut        TEXT DEFAULT 'רגילה';
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS user_id        UUID REFERENCES auth.users(id) DEFAULT auth.uid();
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS dirot_id       UUID;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS sug            TEXT;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS teur           TEXT;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS status         TEXT DEFAULT 'פתוח';
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS makom_bedira   TEXT;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS assigned_to    TEXT;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS adifut         TEXT DEFAULT 'רגילה';
 ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS taarich_pgisha DATE;
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS taarich_yaad  DATE;
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS vendor_id     UUID;
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS skhum         NUMERIC(10,2);
-ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS notes         TEXT;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS taarich_yaad   DATE;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS vendor_id      UUID;
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS skhum          NUMERIC(10,2);
+ALTER TABLE tachzuka ADD COLUMN IF NOT EXISTS notes          TEXT;
 
 -- tachzuka_pritim
 ALTER TABLE tachzuka_pritim ADD COLUMN IF NOT EXISTS user_id    UUID REFERENCES auth.users(id) DEFAULT auth.uid();

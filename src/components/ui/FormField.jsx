@@ -14,9 +14,15 @@ export function FormField({ label, required, children, error }) {
   )
 }
 
-export function Input({ className = '', ...props }) {
+export function Input({ className = '', type, onWheel, ...props }) {
+  // מונע שינוי ערך בגלילת גלגל עכבר בשדות מספריים
+  const handleWheel = type === 'number'
+    ? (e => { e.target.blur(); onWheel?.(e) })
+    : onWheel
   return (
     <input
+      type={type}
+      onWheel={handleWheel}
       {...props}
       className={`w-full px-3 py-2 text-sm rounded-lg border border-slate-200
                   focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent
