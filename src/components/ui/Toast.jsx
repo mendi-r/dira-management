@@ -23,7 +23,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={add}>
       {children}
-      <div className="fixed bottom-6 right-4 z-[100] flex flex-col gap-2 w-[min(90vw,340px)]">
+      <div className="fixed bottom-6 left-4 z-[100] flex flex-col gap-2 w-[min(90vw,340px)]">
         {toasts.map(({ id, msg, type }) => (
           <div key={id} className="flex items-start gap-3 bg-white rounded-xl shadow-lg border border-slate-200 px-4 py-3 fade-in">
             <div className="mt-0.5 flex-shrink-0">{icons[type]}</div>

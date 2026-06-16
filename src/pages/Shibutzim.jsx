@@ -95,7 +95,8 @@ export default function Shibutzim() {
 
   // עדכון חלוקת שכירות לכל הבחורים בדירה מרגע ההצטרפות
   async function recalcBilling(dirotId, fromDate) {
-    const dira = dirot.find(d => d.id === dirotId)
+    const { data: dira } = await supabase.from('dirot')
+      .select('ola_schirut_chodshi').eq('id', dirotId).single()
     if (!dira?.ola_schirut_chodshi) return
     const { data: active } = await supabase.from('shibutzim')
       .select('id, bochurim_id')
@@ -278,58 +279,60 @@ export default function Shibutzim() {
       : await supabase.from('shibutzim').update(payload).eq('id', form.id).select().single()
     if (error) { setSaving(false); toast(error.message, 'error'); return }
 
-    if (isNew && form.taarich_tchila) {
+    // סגירת המודל מיד לאחר שמירה ב-DB (לפני פעולות חיוב)
+    logActivity(isNew?'INSERT':'UPDATE','shibutzim',data.id,'')
+    setSaving(false)
+    toast(isNew ? 'שיבוץ נוסף' : 'עודכן')
+    setModal(false)
+    load(true)
+
+    // שמירת ערכי הטופס לפני שינויי state
+    const _bochurimId   = form.bochurim_id
+    const _dirotId      = form.dirot_id
+    const _taarichStart = form.taarich_tchila
+    const _taarichSiyum = form.taarich_siyum
+    const _origSiyum    = originalSiyum
+
+    if (isNew && _taarichStart) {
       // יצירת שורות גבייה (סכום זמני 0, יתעדכן ע"י recalcBilling)
-      await createMonthlyBilling(form.bochurim_id, form.dirot_id,
-        form.taarich_tchila, form.taarich_siyum, 0)
+      await createMonthlyBilling(_bochurimId, _dirotId, _taarichStart, _taarichSiyum, 0)
       // ── חלוקה דינמית: עדכון כל הבחורים בדירה ──
       if (!manualSplit) {
-        await recalcBilling(form.dirot_id, form.taarich_tchila)
+        await recalcBilling(_dirotId, _taarichStart)
       }
     }
 
     // ── עריכה: טיפול בשינוי תקופת שיבוץ ──
-    if (!isNew && form.taarich_siyum !== originalSiyum) {
-      const newSiyum = form.taarich_siyum
-      const oldSiyum = originalSiyum
+    if (!isNew && _taarichSiyum !== _origSiyum) {
+      const newSiyum = _taarichSiyum
+      const oldSiyum = _origSiyum
       if (newSiyum && oldSiyum) {
         const newEnd = new Date(newSiyum + 'T12:00:00')
         const oldEnd = new Date(oldSiyum + 'T12:00:00')
         if (newEnd < oldEnd) {
-          // קיצור תקופה — מחיקת שורות גבייה שלא שולמו אחרי תאריך הסיום החדש
           const newEndYM = newSiyum.slice(0, 7)
           const { data: deleted } = await supabase.from('gviya')
             .delete()
-            .eq('bochurim_id', form.bochurim_id)
-            .eq('dirot_id', form.dirot_id)
+            .eq('bochurim_id', _bochurimId)
+            .eq('dirot_id', _dirotId)
             .neq('status', 'שולם')
             .gt('chodesh', newEndYM)
             .select('id')
           if (deleted?.length)
             toast(`נמחקו ${deleted.length} שורות גבייה שהוסרו`)
         } else if (newEnd > oldEnd) {
-          // הארכת תקופה — יצירת שורות גבייה לחודשים החדשים בלבד
           const nextMonth = new Date(oldEnd.getFullYear(), oldEnd.getMonth() + 1, 1)
           const startFrom = nextMonth.toISOString().slice(0, 10)
           const ola = data.ola_lebach ?? manualSplit ?? autoSplit?.split ?? 0
-          await createMonthlyBilling(form.bochurim_id, form.dirot_id, startFrom, newSiyum, ola)
+          await createMonthlyBilling(_bochurimId, _dirotId, startFrom, newSiyum, ola)
         }
-      } else if (newSiyum && !oldSiyum) {
-        // לא היה תאריך סיום, עכשיו נוסף — לא יוצרים מחדש, רק אם אין שורות
-        // (createMonthlyBilling כבר בודקת כפילויות, כאן לא עושים כלום)
       }
     }
 
     // אם עריכה וסטטוס שונה ל"הסתיים" — עדכן חלוקה לשאר הבחורים בדירה
     if (!isNew && payload.status === 'הסתיים') {
-      await recalcBilling(form.dirot_id, new Date().toISOString().slice(0, 10))
+      await recalcBilling(_dirotId, new Date().toISOString().slice(0, 10))
     }
-
-    logActivity(isNew?'INSERT':'UPDATE','shibutzim',data.id,'')
-    setSaving(false)
-    toast(isNew ? 'שיבוץ נוסף' : 'עודכן')
-    setModal(false)
-    load(true)
   }
 
   async function remove(id) {
