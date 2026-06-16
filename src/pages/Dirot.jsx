@@ -76,6 +76,9 @@ export default function Dirot() {
   const [chozim, setChozim]           = useState([])
   const [chozimCountMap, setChozimCountMap] = useState({})
   const [currentRentMap, setCurrentRentMap] = useState({})
+  const [editChoza, setEditChoza]     = useState(null)
+  const [editChozaForm, setEditChozaForm] = useState({})
+  const [editChozaSaving, setEditChozaSaving] = useState(false)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -427,16 +430,13 @@ export default function Dirot() {
       await recalcGviyaForDira(form.id, newRent, tchilat_schirut)
     }
 
-    // עדכון היסטוריית חוזים: סגירת הנוכחי + פתיחת חדש
-    await supabase.from('chozim').update({ status: 'הסתיים' })
-      .eq('dirot_id', form.id).eq('status', 'פעיל')
+    // הוספת חוזה חדש להיסטוריה — סטטוס מחושב אוטומטית מהתאריכים בטאב
     await supabase.from('chozim').insert({
       dirot_id: form.id,
       tchilat_schirut,
       sofit_schirut: newEnd || null,
       mispar_chodashim: newMonths,
       ola_schirut_chodshi: newRent,
-      status: 'פעיל',
     })
 
     logActivity('RENEW', 'dirot', form.id, form.ktovet)
@@ -446,6 +446,31 @@ export default function Dirot() {
     setForm(f => ({ ...f, tchilat_schirut, mispar_chodashim: newMonths, sofit_schirut: newEnd || '', ola_schirut_chodshi: newRent }))
     setOriginalRent(newRent)
     setOriginalMisparChodashim(newMonths)
+    loadHistory(form.id)
+    load(true)
+  }
+
+  /** שמירת עריכת חוזה */
+  async function saveChoza() {
+    if (!editChozaForm.tchilat_schirut || !editChozaForm.ola_schirut_chodshi) {
+      toast('יש למלא תאריך תחילה וסכום', 'error'); return
+    }
+    setEditChozaSaving(true)
+    const newEnd = editChozaForm.mispar_chodashim
+      ? calcLeaseEnd(editChozaForm.tchilat_schirut, editChozaForm.mispar_chodashim)
+      : editChozaForm.sofit_schirut || null
+    const { error } = await supabase.from('chozim').update({
+      tchilat_schirut:    editChozaForm.tchilat_schirut,
+      sofit_schirut:      newEnd || null,
+      mispar_chodashim:   editChozaForm.mispar_chodashim ? Number(editChozaForm.mispar_chodashim) : null,
+      ola_schirut_chodshi: Number(editChozaForm.ola_schirut_chodshi),
+      status:             editChozaForm.status,
+      heara:              editChozaForm.heara || null,
+    }).eq('id', editChoza.id)
+    setEditChozaSaving(false)
+    if (error) { toast(error.message, 'error'); return }
+    toast('חוזה עודכן')
+    setEditChoza(null)
     loadHistory(form.id)
     load(true)
   }
@@ -532,13 +557,7 @@ export default function Dirot() {
         ? <span className={free > 0 ? 'text-emerald-600 font-medium' : 'text-slate-500'}>{occ}/{total} ({free} פנויות)</span>
         : '—'
     }},
-    { key:'ola_schirut_chodshi', label:'שכירות', render:(v,r) => {
-      const cur = currentRentMap[r.id]
-      if (cur !== undefined && Number(cur) !== Number(v)) {
-        return <div><span>{currency(cur)}</span><span className="text-xs text-slate-400 block">(חוזה: {currency(v)})</span></div>
-      }
-      return currency(cur ?? v)
-    }},
+    { key:'ola_schirut_chodshi', label:'שכירות', render:(v,r) => currency(currentRentMap[r.id] ?? v) },
     { key:'sofit_schirut', label:'סיום חוזה', render:(v,r)=>{
       const dateEl = !v ? <span>—</span> : (() => {
         const d = daysUntil(v)
@@ -796,11 +815,21 @@ export default function Dirot() {
               ? <p className="text-sm text-slate-400">אין חוזים רשומים עדיין (חוזים חדשים נרשמים אוטומטית)</p>
               : (
                 <div className="space-y-2">
-                  {chozim.map((c, i) => (
-                    <div key={c.id ?? i} className={`flex items-center gap-3 p-3 rounded-xl border ${c.status==='פעיל' ? 'border-teal-200 bg-teal-50' : 'border-slate-200 bg-slate-50'}`}>
+                  {chozim.map((c, i) => {
+                    const todayStr = new Date().toISOString().slice(0,10)
+                    const chozaStatus = !c.tchilat_schirut ? 'פעיל'
+                      : c.tchilat_schirut > todayStr ? 'עתידי'
+                      : (c.sofit_schirut && c.sofit_schirut < todayStr) ? 'הסתיים'
+                      : 'פעיל'
+                    const chozaBorder = chozaStatus === 'פעיל' ? 'border-teal-200 bg-teal-50'
+                      : chozaStatus === 'עתידי' ? 'border-blue-200 bg-blue-50'
+                      : 'border-slate-200 bg-slate-50'
+                    const chozaBadge = chozaStatus === 'פעיל' ? 'green' : chozaStatus === 'עתידי' ? 'blue' : 'gray'
+                    return (
+                    <div key={c.id ?? i} className={`flex items-center gap-3 p-3 rounded-xl border ${chozaBorder}`}>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge color={c.status==='פעיל'?'green':'gray'}>{c.status}</Badge>
+                          <Badge color={chozaBadge}>{chozaStatus}</Badge>
                           <span className="text-sm font-medium text-slate-700">
                             {formatDate(c.tchilat_schirut)} — {formatDate(c.sofit_schirut)}
                           </span>
@@ -810,14 +839,31 @@ export default function Dirot() {
                         </div>
                         <p className="text-sm text-slate-600 mt-0.5">{currency(c.ola_schirut_chodshi)}/חודש</p>
                       </div>
-                      <button
-                        onClick={() => removeChoza(c)}
-                        className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
-                        title="בטל חוזה זה">
-                        <Trash2 size={14}/>
-                      </button>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            setEditChoza(c)
+                            setEditChozaForm({
+                              ...c,
+                              tchilat_schirut: toInputDate(c.tchilat_schirut),
+                              sofit_schirut:   toInputDate(c.sofit_schirut),
+                              mispar_chodashim: c.mispar_chodashim ?? '',
+                            })
+                          }}
+                          className="p-1.5 rounded text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                          title="ערוך חוזה">
+                          <Edit2 size={14}/>
+                        </button>
+                        <button
+                          onClick={() => removeChoza(c)}
+                          className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
+                          title="בטל חוזה זה">
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             }
@@ -860,6 +906,50 @@ export default function Dirot() {
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={()=>setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
+        </div>
+      </Modal>
+
+      {/* ── מודל עריכת חוזה ── */}
+      <Modal open={!!editChoza} onClose={() => setEditChoza(null)} title="עריכת חוזה" size="sm">
+        <div className="space-y-4">
+          <FormField label="תאריך תחילה" required>
+            <Input type="date" value={editChozaForm.tchilat_schirut ?? ''}
+              onChange={e => {
+                const val = e.target.value
+                const newEnd = calcLeaseEnd(val, editChozaForm.mispar_chodashim)
+                setEditChozaForm(f => ({ ...f, tchilat_schirut: val, ...(newEnd ? { sofit_schirut: newEnd } : {}) }))
+              }}/>
+          </FormField>
+          <FormField label="מספר חודשים">
+            <Input type="number" min="1" value={editChozaForm.mispar_chodashim ?? ''}
+              onChange={e => {
+                const val = e.target.value
+                const newEnd = calcLeaseEnd(editChozaForm.tchilat_schirut, val)
+                setEditChozaForm(f => ({ ...f, mispar_chodashim: val, ...(newEnd ? { sofit_schirut: newEnd } : {}) }))
+              }} placeholder="12"/>
+            {editChozaForm.sofit_schirut && (
+              <p className="text-xs text-teal-600 mt-1 px-1">סיום: {formatDate(editChozaForm.sofit_schirut)}</p>
+            )}
+          </FormField>
+          <FormField label="עלות שכירות (₪)" required>
+            <Input type="number" min="0" value={editChozaForm.ola_schirut_chodshi ?? ''}
+              onChange={e => setEditChozaForm(f => ({ ...f, ola_schirut_chodshi: e.target.value }))}/>
+          </FormField>
+          <FormField label="סטטוס">
+            <Select value={editChozaForm.status ?? 'פעיל'}
+              onChange={e => setEditChozaForm(f => ({ ...f, status: e.target.value }))}>
+              <option value="פעיל">פעיל</option>
+              <option value="הסתיים">הסתיים</option>
+            </Select>
+          </FormField>
+          <FormField label="הערה">
+            <Textarea value={editChozaForm.heara ?? ''} rows={2}
+              onChange={e => setEditChozaForm(f => ({ ...f, heara: e.target.value }))}/>
+          </FormField>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={() => setEditChoza(null)}>ביטול</Button>
+          <Button loading={editChozaSaving} onClick={saveChoza}>שמור</Button>
         </div>
       </Modal>
 
