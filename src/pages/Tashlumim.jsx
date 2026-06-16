@@ -124,6 +124,17 @@ export default function Tashlumim() {
     toast('נמחק'); load(true)
   }
 
+  async function deleteAll() {
+    if (!await confirm(
+      `למחוק את כל ${rows.length} הרשומות בתשלומים לבעלים?\n\nפעולה זו בלתי הפיכה לחלוטין.`,
+      { danger: true, confirmText: 'מחק הכל', cancelText: 'ביטול' }
+    )) return
+    const { error } = await supabase.from('tashlumim_baalim').delete().not('id', 'is', null)
+    if (error) { toast(error.message, 'error'); return }
+    toast('כל הרשומות נמחקו')
+    load(true)
+  }
+
   async function togglePaid(row) {
     const isFullyPaid = row.status === 'שולם'
     const { error } = await supabase.from('tashlumim_baalim').update(
@@ -226,6 +237,11 @@ export default function Tashlumim() {
           })), 'tashlumim_baalim.csv')}>
           ייצוא
         </Button>
+        <button onClick={deleteAll}
+          className="h-9 px-3 text-sm rounded-lg border border-red-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-400 flex items-center gap-1.5 transition-colors">
+          <Trash2 size={14}/>
+          מחק הכל
+        </button>
         <Button icon={PlusCircle} onClick={openNew}>תשלום חדש</Button>
       </div>
 
