@@ -69,6 +69,9 @@ export default function Dirot() {
   const [alerts, setAlerts]     = useState([])
   const [originalRent, setOriginalRent] = useState(null)
   const [originalMisparChodashim, setOriginalMisparChodashim] = useState(null)
+  const [renewModal, setRenewModal] = useState(false)
+  const [renewForm, setRenewForm]   = useState({ tchilat_schirut:'', mispar_chodashim:'', ola_schirut_chodshi:'' })
+  const [renewSaving, setRenewSaving] = useState(false)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -317,6 +320,82 @@ export default function Dirot() {
     }
   }
 
+  /** עדכון גבייה לפי חודש עם שכירות חדשה — זהה ללוגיקה בשיבוצים */
+  async function recalcGviyaForDira(dirotId, rent, fromDate) {
+    const { data: shibutzim } = await supabase.from('shibutzim')
+      .select('bochurim_id, taarich_tchila, taarich_siyum')
+      .eq('dirot_id', dirotId)
+      .in('status', ['פעיל', 'הסתיים'])
+    if (!shibutzim?.length) return
+    const fromYM = fromDate ? fromDate.slice(0, 7) : '2000-01'
+    const { data: gviyaRows } = await supabase.from('gviya')
+      .select('id, chodesh')
+      .eq('dirot_id', dirotId)
+      .neq('status', 'שולם')
+      .gte('chodesh', fromYM)
+    if (!gviyaRows?.length) return
+    for (const g of gviyaRows) {
+      const ym = g.chodesh
+      const [y, m] = ym.split('-').map(Number)
+      const monthStart = `${ym}-01`
+      const monthEnd = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`
+      const count = shibutzim.filter(s => {
+        const sStart = s.taarich_tchila ?? '1900-01-01'
+        const sEnd   = s.taarich_siyum  ?? '2999-12-31'
+        return sStart <= monthEnd && sEnd >= monthStart
+      }).length
+      await supabase.from('gviya').update({ skhum: count > 0 ? Math.round(rent / count) : rent }).eq('id', g.id)
+    }
+    toast('עודכנו תנועות גבייה לפי שכירות חדשה')
+  }
+
+  /** חידוש חוזה — תקופה חדשה על אותה דירה */
+  async function renewContract() {
+    const { tchilat_schirut, mispar_chodashim, ola_schirut_chodshi } = renewForm
+    if (!tchilat_schirut || !mispar_chodashim || !ola_schirut_chodshi) {
+      toast('יש למלא תאריך תחילה, מספר חודשים וסכום', 'error'); return
+    }
+    const newEnd    = calcLeaseEnd(tchilat_schirut, mispar_chodashim)
+    const newRent   = Number(ola_schirut_chodshi)
+    const newMonths = Number(mispar_chodashim)
+
+    const ok = await confirm(
+      `חידוש חוזה לדירה ${form.ktovet}:\n` +
+      `תחילה: ${formatDate(tchilat_schirut)}\n` +
+      `סיום: ${formatDate(newEnd)}\n` +
+      `עלות: ${currency(newRent)}/חודש\n\n` +
+      `יווצרו ${newMonths} שורות תשלום חדשות לבעלים.`,
+      { confirmText: 'חדש חוזה', cancelText: 'ביטול' }
+    )
+    if (!ok) return
+
+    setRenewSaving(true)
+    const { error } = await supabase.from('dirot').update({
+      tchilat_schirut,
+      mispar_chodashim: newMonths,
+      sofit_schirut: newEnd || null,
+      ola_schirut_chodshi: newRent,
+    }).eq('id', form.id)
+    if (error) { toast(error.message, 'error'); setRenewSaving(false); return }
+
+    // יצירת שורות תשלום לבעלים לתקופה החדשה
+    await addOwnerPaymentMonths(form.id, tchilat_schirut, 0, newMonths, newRent, form.payment_day ?? 1)
+
+    // עדכון גבייה אם השכירות השתנתה
+    if (newRent !== Number(form.ola_schirut_chodshi)) {
+      await recalcGviyaForDira(form.id, newRent, tchilat_schirut)
+    }
+
+    logActivity('RENEW', 'dirot', form.id, form.ktovet)
+    toast('החוזה חודש בהצלחה')
+    setRenewSaving(false)
+    setRenewModal(false)
+    setForm(f => ({ ...f, tchilat_schirut, mispar_chodashim: newMonths, sofit_schirut: newEnd || '', ola_schirut_chodshi: newRent }))
+    setOriginalRent(newRent)
+    setOriginalMisparChodashim(newMonths)
+    load(true)
+  }
+
   async function remove(id, addr) {
     if (!await confirm(`למחוק את הדירה ${addr}?`, { danger: true })) return
     await supabase.from('dirot').delete().eq('id', id)
@@ -485,7 +564,18 @@ export default function Dirot() {
         {/* ── Tab: חוזה ותשלום ── */}
         {activeTab==='chozeh' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-            <FormField label="עלות שכירות חודשית (₪)" required><Input type="number" min="0" value={form.ola_schirut_chodshi??''} onChange={set('ola_schirut_chodshi')}/></FormField>
+            <FormField label="עלות שכירות חודשית (₪)" required>
+              {form.id ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 px-3 py-2 bg-slate-100 rounded-lg text-slate-700 text-sm font-medium border border-slate-200">
+                    {currency(form.ola_schirut_chodshi) || '—'}
+                  </div>
+                  <span className="text-xs text-slate-400 whitespace-nowrap">🔒 נעול</span>
+                </div>
+              ) : (
+                <Input type="number" min="0" value={form.ola_schirut_chodshi??''} onChange={set('ola_schirut_chodshi')}/>
+              )}
+            </FormField>
             <div/>
             <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
               <FormField label="תחילת שכירות" required>
@@ -503,7 +593,25 @@ export default function Dirot() {
                 <p className="text-xs text-slate-400 mt-1 px-1">{toHebrewDate(form.sofit_schirut)}</p>
               )}
             </FormField>
-            <div/>
+            {form.id ? (
+              <div className="flex items-end pb-0.5">
+                <button
+                  onClick={() => {
+                    const nextStart = form.sofit_schirut
+                      ? new Date(new Date(form.sofit_schirut + 'T12:00:00').getTime() + 86400000).toISOString().slice(0,10)
+                      : ''
+                    setRenewForm({
+                      tchilat_schirut: nextStart,
+                      mispar_chodashim: form.mispar_chodashim ?? '',
+                      ola_schirut_chodshi: form.ola_schirut_chodshi ?? '',
+                    })
+                    setRenewModal(true)
+                  }}
+                  className="w-full px-4 py-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
+                  🔄 חדש חוזה
+                </button>
+              </div>
+            ) : <div/>}
             <hr className="sm:col-span-2 border-slate-100"/>
             <p className="sm:col-span-2 text-sm font-semibold text-slate-600">תשלום לבעלים</p>
             <FormField label="אמצעי תשלום">
@@ -582,6 +690,46 @@ export default function Dirot() {
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={()=>setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
+        </div>
+      </Modal>
+
+      {/* ── מודל חידוש חוזה ── */}
+      <Modal open={renewModal} onClose={()=>setRenewModal(false)} title={`חידוש חוזה — ${form.ktovet ?? ''}`} size="sm">
+        <div className="space-y-4">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+            חוזה נוכחי: <strong>{formatDate(form.tchilat_schirut)}</strong> עד <strong>{formatDate(form.sofit_schirut)}</strong>
+          </div>
+          <FormField label="תאריך תחילה חדש" required>
+            <Input type="date" value={renewForm.tchilat_schirut}
+              onChange={e => {
+                const val = e.target.value
+                const newEnd = calcLeaseEnd(val, renewForm.mispar_chodashim)
+                setRenewForm(f => ({ ...f, tchilat_schirut: val, _sofit: newEnd }))
+              }}/>
+          </FormField>
+          <FormField label="מספר חודשים" required>
+            <Input type="number" min="1" value={renewForm.mispar_chodashim}
+              onChange={e => {
+                const val = e.target.value
+                const newEnd = calcLeaseEnd(renewForm.tchilat_schirut, val)
+                setRenewForm(f => ({ ...f, mispar_chodashim: val, _sofit: newEnd }))
+              }} placeholder="12"/>
+            {renewForm._sofit && (
+              <p className="text-xs text-teal-600 mt-1 px-1">סיום: {formatDate(renewForm._sofit)}</p>
+            )}
+          </FormField>
+          <FormField label="עלות שכירות חודשית (₪)" required>
+            <Input type="number" min="0" value={renewForm.ola_schirut_chodshi}
+              onChange={e => setRenewForm(f => ({ ...f, ola_schirut_chodshi: e.target.value }))}/>
+          </FormField>
+          <p className="text-xs text-slate-500">
+            ✓ יווצרו שורות תשלום לבעלים לתקופה החדשה<br/>
+            ✓ ההיסטוריה של החוזה הנוכחי תישמר בתנועות
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={()=>setRenewModal(false)}>ביטול</Button>
+          <Button loading={renewSaving} onClick={renewContract}>חדש חוזה</Button>
         </div>
       </Modal>
     </div>
