@@ -35,7 +35,7 @@ const EMPTY = {
   amla_chodshit:'', drive_link:'', heara:'',
 }
 
-const STATUS_COLORS = { פעיל:'green', 'לא_פעיל':'gray', בהמתנה:'yellow' }
+const STATUS_COLORS = { פעיל:'green', 'לא_פעיל':'gray', בהמתנה:'yellow', הוסר:'red' }
 const VISA_STATUS_COLORS = { בתוקף:'green', פג:'red', 'בקרוב':'yellow' }
 
 const TABS = [
@@ -69,6 +69,7 @@ export default function Bochurim() {
     if (!silent) setLoading(true)
     let q = supabase.from('bochurim').select('*').order('shem')
     if (statusFilter) q = q.eq('status', statusFilter)
+    else q = q.neq('status', 'הוסר')
     const [{ data }, { data: activeShib }] = await Promise.all([
       q,
       supabase.from('shibutzim').select('bochurim_id').eq('status', 'פעיל'),
@@ -143,9 +144,23 @@ export default function Bochurim() {
 
   async function remove(id, name) {
     if (!await confirm(`למחוק את ${name}?`, { danger: true })) return
-    await supabase.from('bochurim').delete().eq('id', id)
-    logActivity('DELETE', 'bochurim', id, name)
-    toast('נמחק')
+
+    const deleteAll = await confirm(
+      `האם למחוק גם את כל התנועות של ${name}?\n(גבייה, שיבוצים וכו׳)\n\n"שמור תנועות" יסיר אותו מהרשימה אבל ישאיר את הנתונים הכספיים.`,
+      { danger: true, confirmText: 'מחק הכל', cancelText: 'שמור תנועות' }
+    )
+
+    if (deleteAll) {
+      await supabase.from('gviya').delete().eq('bochurim_id', id)
+      await supabase.from('shibutzim').delete().eq('bochurim_id', id)
+      await supabase.from('bochurim').delete().eq('id', id)
+      logActivity('DELETE', 'bochurim', id, name)
+      toast(`${name} נמחק לחלוטין`)
+    } else {
+      await supabase.from('bochurim').update({ status: 'הוסר' }).eq('id', id)
+      logActivity('ARCHIVE', 'bochurim', id, name)
+      toast(`${name} הוסר מהרשימה — התנועות נשמרו`)
+    }
     load(true)
   }
 
@@ -205,6 +220,7 @@ export default function Bochurim() {
           <option value="פעיל">פעיל</option>
           <option value="לא_פעיל">לא פעיל</option>
           <option value="בהמתנה">בהמתנה</option>
+          <option value="הוסר">הוסר (שמור תנועות)</option>
         </select>
         <button
           onClick={() => { setAssignedFilter(false); setUnassignedFilter(f => !f) }}
