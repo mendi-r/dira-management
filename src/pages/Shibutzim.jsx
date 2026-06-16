@@ -631,31 +631,50 @@ export default function Shibutzim() {
 
           {/* מידע מיטות — לפי חודש אם יש תאריכים, אחרת תפוסה נוכחית */}
           {capacityInfo ? (
-            <div className={`col-span-2 rounded-xl border p-3 text-sm ${
-              capacityInfo.hasFullMonth ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'
+            <div className={`col-span-2 rounded-xl border p-4 ${
+              capacityInfo.hasFullMonth ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'
             }`}>
-              <div className="flex items-center gap-2 mb-2">
-                <Bed size={14} className="flex-shrink-0 text-slate-500"/>
-                <span className="font-semibold text-slate-700">תפוסה לפי חודש ({capacityInfo.total} מיטות)</span>
-                {capacityInfo.hasFullMonth && (
-                  <span className="flex items-center gap-1 text-red-600 font-medium text-xs">
-                    <AlertTriangle size={12}/> יש חודשים מלאים — לא ניתן לשבץ
+              {/* כותרת */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Bed size={16} className={capacityInfo.hasFullMonth ? 'text-red-500' : 'text-emerald-600'}/>
+                  <span className="font-semibold text-sm text-slate-700">זמינות לפי חודשים — {capacityInfo.total} מיטות</span>
+                </div>
+                {capacityInfo.hasFullMonth ? (
+                  <span className="flex items-center gap-1 text-xs font-medium text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
+                    <AlertTriangle size={11}/> יש חודשים מלאים
+                  </span>
+                ) : (
+                  <span className="text-xs font-medium text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    ✓ כל החודשים פנויים
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {capacityInfo.months.map(mo => (
-                  <div key={mo.ym} className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${
-                    mo.full
-                      ? 'bg-red-100 text-red-700 border-red-300'
-                      : mo.count >= mo.total - 1
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-green-50 text-green-700 border-green-200'
-                  }`}>
-                    {mo.label}: {mo.count}/{mo.total}
-                    {mo.full ? ' 🔴' : ' ✓'}
-                  </div>
-                ))}
+              {/* רשת חודשים */}
+              <div className="grid gap-2" style={{gridTemplateColumns: `repeat(${Math.min(capacityInfo.months.length, 4)}, 1fr)`}}>
+                {capacityInfo.months.map(mo => {
+                  const free = mo.total - mo.count
+                  return (
+                    <div key={mo.ym} className={`rounded-xl p-2.5 text-center border ${
+                      mo.full
+                        ? 'bg-red-100 border-red-300'
+                        : free === 1
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-white border-emerald-200'
+                    }`}>
+                      <div className={`text-xs font-bold mb-1 ${mo.full ? 'text-red-700' : free === 1 ? 'text-amber-700' : 'text-slate-700'}`}>
+                        {mo.label}
+                      </div>
+                      <div className={`text-lg font-bold leading-none ${mo.full ? 'text-red-600' : free === 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {mo.full ? '🔴' : free === 1 ? '⚠️' : '✓'}
+                      </div>
+                      <div className={`text-xs mt-1 ${mo.full ? 'text-red-600' : free === 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {mo.full ? 'מלאה' : `${free} פנוי${free > 1 ? 'ות' : ''}`}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">{mo.count}/{mo.total} תפוס</div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ) : bedInfo ? (
