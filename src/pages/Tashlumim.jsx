@@ -36,6 +36,7 @@ export default function Tashlumim() {
   const [search, setSearch]   = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [monthFilter, setMonthFilter]   = useState('')
+  const [overdueFilter, setOverdueFilter] = useState(false)
   const [modal, setModal]     = useState(false)
   const [form, setForm]       = useState(EMPTY)
   const [saving, setSaving]   = useState(false)
@@ -65,7 +66,9 @@ export default function Tashlumim() {
 
   const filtered = rows.filter(r => {
     const addr = `${r.dirot?.ktovet??''} ${r.dirot?.ir??''} ${r.dirot?.baalim_shem??''}`
-    return addr.toLowerCase().includes(search.toLowerCase())
+    const textMatch = addr.toLowerCase().includes(search.toLowerCase())
+    const overdueMatch = !overdueFilter || isOverdue(r)
+    return textMatch && overdueMatch
   })
 
   const totalCharged = filtered.reduce((s,r) => s + Number(r.skhum??0), 0)
@@ -134,7 +137,7 @@ export default function Tashlumim() {
   }
 
   function clearFilters() {
-    setSearch(''); setStatusFilter(''); setMonthFilter('')
+    setSearch(''); setStatusFilter(''); setMonthFilter(''); setOverdueFilter(false)
   }
 
   const currentMonth = new Date().toISOString().slice(0, 7)
@@ -203,7 +206,7 @@ export default function Tashlumim() {
           className={`h-9 px-3 text-sm rounded-lg border transition-colors ${monthFilter===prevMonth?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
           חודש קודם
         </button>
-        {(search || statusFilter || monthFilter) && (
+        {(search || statusFilter || monthFilter || overdueFilter) && (
           <button onClick={clearFilters} className="h-9 px-3 text-sm rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
             ✕ נקה סינון
           </button>
@@ -232,7 +235,7 @@ export default function Tashlumim() {
         if (!overdueRows.length) return null
         return (
           <button
-            onClick={() => setStatusFilter('לא שולם')}
+            onClick={() => setOverdueFilter(true)}
             className="w-full flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-right">
             <AlertTriangle size={16} className="text-red-600 flex-shrink-0"/>
             <div className="flex-1">
@@ -244,8 +247,7 @@ export default function Tashlumim() {
       })()}
 
       <p className="text-sm text-slate-400">{filtered.length} רשומות</p>
-      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}
-        rowClassName={row => isOverdue(row) ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}/>
+      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}/>
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? 'עריכת תשלום' : 'תשלום חדש לבעלים'} size="lg">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

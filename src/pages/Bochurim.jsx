@@ -242,12 +242,6 @@ export default function Bochurim() {
             <button onClick={()=>setAlertFilter('')} className="text-xs text-slate-400 hover:text-red-500">✕ נקה</button>
           </div>
         )}
-        {unassignedFilter && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">מסנן: ללא שיבוץ ({filtered.length})</span>
-            <button onClick={()=>setUnassignedFilter(false)} className="text-xs text-slate-400 hover:text-red-500">✕ נקה</button>
-          </div>
-        )}
       </div>
 
       <p className="text-sm text-slate-400">{filtered.length} בחורים</p>
