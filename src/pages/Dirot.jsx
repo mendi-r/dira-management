@@ -68,6 +68,7 @@ export default function Dirot() {
   const [history, setHistory]   = useState([])
   const [alerts, setAlerts]     = useState([])
   const [originalRent, setOriginalRent] = useState(null)
+  const [originalMisparChodashim, setOriginalMisparChodashim] = useState(null)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -116,7 +117,7 @@ export default function Dirot() {
     return textMatch && alertMatch && freeBedMatch
   })
 
-  function openNew()  { setForm(EMPTY); setActiveTab('dira'); setHistory([]); setOriginalRent(null); setModal(true) }
+  function openNew()  { setForm(EMPTY); setActiveTab('dira'); setHistory([]); setOriginalRent(null); setOriginalMisparChodashim(null); setModal(true) }
   function openEdit(r){
     setForm({
       ...EMPTY, ...r,
@@ -125,6 +126,7 @@ export default function Dirot() {
       bituach_chadush: toInputDate(r.bituach_chadush),
     })
     setOriginalRent(r.ola_schirut_chodshi ?? null)
+    setOriginalMisparChodashim(r.mispar_chodashim ?? null)
     setActiveTab('dira')
     if (r.id) loadHistory(r.id)
     setModal(true)
@@ -170,6 +172,27 @@ export default function Dirot() {
     payload.mispar_chodashim    = n(payload.mispar_chodashim)
     delete payload.id; delete payload.created_at; delete payload.user_id
 
+    // ── בדיקה לפני שמירה: קיצור חודשי שכירות ──
+    if (form.id && payload.mispar_chodashim && originalMisparChodashim &&
+        payload.mispar_chodashim < Number(originalMisparChodashim) &&
+        form.tchilat_schirut) {
+      const cutoffYM = monthAt(form.tchilat_schirut, payload.mispar_chodashim)
+      const { data: extraRows } = await supabase.from('tashlumim_baalim')
+        .select('id, status, chodesh')
+        .eq('dirot_id', form.id)
+        .gte('chodesh', cutoffYM)
+      if (extraRows?.length > 0) {
+        const paid = extraRows.filter(r => r.status === 'שולם').length
+        const unpaid = extraRows.length - paid
+        const paidNote = paid > 0 ? `\n⚠️ ${paid} מהן כבר שולמו!` : ''
+        const ok = await confirm(
+          `הקיצור מ-${originalMisparChodashim} ל-${payload.mispar_chodashim} חודשים ייסיר ${extraRows.length} תשלומים לבעלים (${unpaid} לא שולמו${paidNote}).\n\nהאם למחוק אותם?`,
+          { danger: true, confirmText: 'מחק', cancelText: 'ביטול' }
+        )
+        if (!ok) { setSaving(false); return }
+      }
+    }
+
     const isNew = !form.id
     const { data, error } = isNew
       ? await supabase.from('dirot').insert(payload).select().single()
@@ -206,6 +229,28 @@ export default function Dirot() {
         payload.ola_schirut_chodshi, payload.payment_day ?? 1)
     }
 
+    // הגדלת חודשי שכירות: יצירת תשלומים לחודשים החדשים
+    if (!isNew && payload.mispar_chodashim && originalMisparChodashim &&
+        payload.mispar_chodashim > Number(originalMisparChodashim) &&
+        payload.tchilat_schirut) {
+      await addOwnerPaymentMonths(
+        data.id, payload.tchilat_schirut,
+        Number(originalMisparChodashim), payload.mispar_chodashim,
+        payload.ola_schirut_chodshi, payload.payment_day ?? 1
+      )
+    }
+
+    // קיצור חודשי שכירות: מחיקת תשלומים שהוסרו (המשתמש אישר לעיל)
+    if (!isNew && payload.mispar_chodashim && originalMisparChodashim &&
+        payload.mispar_chodashim < Number(originalMisparChodashim) &&
+        payload.tchilat_schirut) {
+      const cutoffYM = monthAt(payload.tchilat_schirut, payload.mispar_chodashim)
+      await supabase.from('tashlumim_baalim')
+        .delete()
+        .eq('dirot_id', data.id)
+        .gte('chodesh', cutoffYM)
+    }
+
     toast(isNew ? 'דירה נוספה' : 'עודכן')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
     load(true)
@@ -238,6 +283,38 @@ export default function Dirot() {
     if (rows.length > 0) {
       await supabase.from('tashlumim_baalim').insert(rows)
       toast(`נוצרו ${rows.length} שורות תשלום לבעלים`)
+    }
+  }
+
+  /** YYYY-MM של החודש ה-`index` מ-`start` (0 = חודש ראשון) */
+  function monthAt(start, index) {
+    const d = new Date(start + 'T12:00:00')
+    d.setMonth(d.getMonth() + index)
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+  }
+
+  /** יצירת שורות תשלום לבעלים רק עבור חודשים fromIdx..toIdx-1 (הגדלת תקופה) */
+  async function addOwnerPaymentMonths(dirotId, start, fromIdx, toIdx, skhum, payDay) {
+    const rows = []
+    for (let i = fromIdx; i < toIdx; i++) {
+      const d = new Date(start + 'T12:00:00')
+      d.setMonth(d.getMonth() + i)
+      const y = d.getFullYear(), m = d.getMonth() + 1
+      const ym = `${y}-${String(m).padStart(2,'0')}`
+      const daysInMonth = new Date(y, m, 0).getDate()
+      const day = Math.min(Number(payDay || 1), daysInMonth)
+      rows.push({
+        dirot_id: dirotId,
+        skhum: Number(skhum),
+        taarich: `${ym}-${String(day).padStart(2,'0')}`,
+        chodesh: ym,
+        payment_day: day,
+        status: 'לא שולם',
+      })
+    }
+    if (rows.length > 0) {
+      const { error } = await supabase.from('tashlumim_baalim').insert(rows)
+      if (!error) toast(`נוצרו ${rows.length} תשלומים חדשים לבעלים`)
     }
   }
 

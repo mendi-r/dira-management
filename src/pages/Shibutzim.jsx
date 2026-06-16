@@ -262,6 +262,30 @@ export default function Shibutzim() {
       }
     }
 
+    // ── בדיקה לפני שמירה: קיצור תקופת שיבוץ → שאל על שורות גבייה ──
+    if (!isNew && form.taarich_siyum && originalSiyum && form.taarich_siyum !== originalSiyum) {
+      const newEnd = new Date(form.taarich_siyum + 'T12:00:00')
+      const oldEnd = new Date(originalSiyum + 'T12:00:00')
+      if (newEnd < oldEnd) {
+        const newEndYM = form.taarich_siyum.slice(0, 7)
+        const { data: extraGviya } = await supabase.from('gviya')
+          .select('id, status, chodesh')
+          .eq('bochurim_id', form.bochurim_id)
+          .eq('dirot_id', form.dirot_id)
+          .gt('chodesh', newEndYM)
+        if (extraGviya?.length > 0) {
+          const paid = extraGviya.filter(r => r.status === 'שולם').length
+          const unpaid = extraGviya.length - paid
+          const paidNote = paid > 0 ? `\n⚠️ ${paid} מהן כבר שולמו!` : ''
+          const ok = await confirm(
+            `הקיצור ייסיר ${extraGviya.length} שורות גבייה (${unpaid} לא שולמו${paidNote}).\n\nהאם למחוק אותן?`,
+            { danger: true, confirmText: 'מחק', cancelText: 'ביטול (שמור חודשים)' }
+          )
+          if (!ok) { setSaving(false); return }
+        }
+      }
+    }
+
     // שמירת השיבוץ (olla_lebach יתעדכן ע"י recalcBilling)
     const manualSplit = form.ola_lebach ? Number(form.ola_lebach) : null
     const payload = {
@@ -315,11 +339,10 @@ export default function Shibutzim() {
             .delete()
             .eq('bochurim_id', _bochurimId)
             .eq('dirot_id', _dirotId)
-            .neq('status', 'שולם')
             .gt('chodesh', newEndYM)
             .select('id')
           if (deleted?.length)
-            toast(`נמחקו ${deleted.length} שורות גבייה שהוסרו`)
+            toast(`נמחקו ${deleted.length} שורות גבייה`)
         } else if (newEnd > oldEnd) {
           const nextMonth = new Date(oldEnd.getFullYear(), oldEnd.getMonth() + 1, 1)
           const startFrom = nextMonth.toISOString().slice(0, 10)
