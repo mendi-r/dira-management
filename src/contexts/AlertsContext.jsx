@@ -1,0 +1,81 @@
+import React, { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { daysUntil } from '../lib/utils'
+
+const AlertsCtx = createContext({ alerts: [], total: 0, reload: () => {} })
+
+export function AlertsProvider({ children }) {
+  const [alerts, setAlerts] = useState([])
+
+  async function load() {
+    const [{ data: bochurim }, { data: dirot }] = await Promise.all([
+      supabase.from('bochurim').select('id,shem,mishpacha,tokef_viza').not('tokef_viza','is',null),
+      supabase.from('dirot').select('id,ktovet,sofit_schirut,bituach_chadush'),
+    ])
+
+    const list = []
+
+    // ויזות פוגות תוך 30 יום
+    ;(bochurim ?? []).forEach(b => {
+      const d = daysUntil(b.tokef_viza)
+      if (d !== null && d <= 30 && d >= -7) {
+        list.push({
+          type: 'visa',
+          severity: d < 0 ? 'error' : d <= 7 ? 'error' : 'warning',
+          label: `ויזה: ${b.shem ?? ''} ${b.mishpacha ?? ''}`,
+          days: d,
+          nav: '/bochurim',
+        })
+      }
+    })
+
+    // חוזים מסתיימים תוך 30 יום
+    ;(dirot ?? []).forEach(d => {
+      const dc = daysUntil(d.sofit_schirut)
+      if (dc !== null && dc <= 30 && dc >= -7) {
+        list.push({
+          type: 'contract',
+          severity: dc < 0 ? 'error' : dc <= 7 ? 'error' : 'warning',
+          label: `חוזה: ${d.ktovet ?? ''}`,
+          days: dc,
+          nav: '/dirot',
+        })
+      }
+      // ביטוח
+      const db = daysUntil(d.bituach_chadush)
+      if (db !== null && db <= 30 && db >= -7) {
+        list.push({
+          type: 'insurance',
+          severity: db < 0 ? 'error' : 'warning',
+          label: `ביטוח: ${d.ktovet ?? ''}`,
+          days: db,
+          nav: '/dirot',
+        })
+      }
+    })
+
+    // Sort: errors first, then by days
+    list.sort((a, b) => {
+      if (a.severity !== b.severity) return a.severity === 'error' ? -1 : 1
+      return a.days - b.days
+    })
+
+    setAlerts(list)
+  }
+
+  useEffect(() => {
+    load()
+    const interval = setInterval(load, 5 * 60 * 1000) // refresh every 5 min
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <AlertsCtx.Provider value={{ alerts, total: alerts.length, reload: load }}>
+      {children}
+    </AlertsCtx.Provider>
+  )
+}
+
+export function useAlerts() {
+  return useContext(AlertsCtx)
+}
