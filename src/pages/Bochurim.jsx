@@ -203,6 +203,18 @@ export default function Bochurim() {
           <option value="לא_פעיל">לא פעיל</option>
           <option value="בהמתנה">בהמתנה</option>
         </select>
+        <button
+          onClick={() => setUnassignedFilter(f => !f)}
+          className={`h-9 px-3 text-sm rounded-lg border transition-colors ${unassignedFilter ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'}`}>
+          ללא שיבוץ
+        </button>
+        {(search || statusFilter || alertFilter || unassignedFilter) && (
+          <button
+            onClick={() => { setSearch(''); setStatusFilter(''); setAlertFilter(''); setUnassignedFilter(false) }}
+            className="h-9 px-3 text-sm rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
+            ✕ נקה סינון
+          </button>
+        )}
         <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
           <RefreshCw size={16}/>
         </button>

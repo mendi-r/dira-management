@@ -66,6 +66,7 @@ export default function Dirot() {
   const [saving, setSaving]     = useState(false)
   const [history, setHistory]   = useState([])
   const [alerts, setAlerts]     = useState([])
+  const [originalRent, setOriginalRent] = useState(null)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -114,7 +115,7 @@ export default function Dirot() {
     return textMatch && alertMatch && freeBedMatch
   })
 
-  function openNew()  { setForm(EMPTY); setActiveTab('dira'); setHistory([]); setModal(true) }
+  function openNew()  { setForm(EMPTY); setActiveTab('dira'); setHistory([]); setOriginalRent(null); setModal(true) }
   function openEdit(r){
     setForm({
       ...EMPTY, ...r,
@@ -122,6 +123,7 @@ export default function Dirot() {
       sofit_schirut:   toInputDate(r.sofit_schirut),
       bituach_chadush: toInputDate(r.bituach_chadush),
     })
+    setOriginalRent(r.ola_schirut_chodshi ?? null)
     setActiveTab('dira')
     if (r.id) loadHistory(r.id)
     setModal(true)
@@ -176,7 +178,9 @@ export default function Dirot() {
     logActivity(isNew ? 'INSERT' : 'UPDATE', 'dirot', data.id, form.ktovet)
 
     // עדכון רטרואקטיבי — כשסכום שכירות משתנה, עדכן שורות גבייה פתוחות
-    if (!isNew && payload.ola_schirut_chodshi) {
+    const rentChanged = payload.ola_schirut_chodshi !== null &&
+      payload.ola_schirut_chodshi !== Number(originalRent)
+    if (!isNew && rentChanged) {
       const { count: occupants } = await supabase
         .from('shibutzim')
         .select('*', { count: 'exact', head: true })

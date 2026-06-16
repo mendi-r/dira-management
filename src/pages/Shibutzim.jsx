@@ -50,6 +50,7 @@ export default function Shibutzim() {
   const [saving, setSaving]     = useState(false)
   const [autoSplit, setAutoSplit] = useState(null)
   const [bedInfo, setBedInfo]   = useState(null)
+  const [originalSiyum, setOriginalSiyum] = useState(null)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -121,10 +122,11 @@ export default function Shibutzim() {
     return `${name} ${addr}`.toLowerCase().includes(search.toLowerCase())
   })
 
-  function openNew()  { setForm(EMPTY); setAutoSplit(null); setBedInfo(null); setModal(true) }
+  function openNew()  { setForm(EMPTY); setAutoSplit(null); setBedInfo(null); setOriginalSiyum(null); setModal(true) }
   function openEdit(r){
     setForm({ ...EMPTY, ...r, taarich_tchila: toInputDate(r.taarich_tchila), taarich_siyum: toInputDate(r.taarich_siyum) })
     setAutoSplit(null); setBedInfo(null)
+    setOriginalSiyum(r.taarich_siyum ? toInputDate(r.taarich_siyum) : null)
     setModal(true)
     if (r.dirot_id) calcSplit(r.dirot_id, r.id)
   }
@@ -254,6 +256,38 @@ export default function Shibutzim() {
       // ── חלוקה דינמית: עדכון כל הבחורים בדירה ──
       if (!manualSplit) {
         await recalcBilling(form.dirot_id, form.taarich_tchila)
+      }
+    }
+
+    // ── עריכה: טיפול בשינוי תקופת שיבוץ ──
+    if (!isNew && form.taarich_siyum !== originalSiyum) {
+      const newSiyum = form.taarich_siyum
+      const oldSiyum = originalSiyum
+      if (newSiyum && oldSiyum) {
+        const newEnd = new Date(newSiyum + 'T12:00:00')
+        const oldEnd = new Date(oldSiyum + 'T12:00:00')
+        if (newEnd < oldEnd) {
+          // קיצור תקופה — מחיקת שורות גבייה שלא שולמו אחרי תאריך הסיום החדש
+          const newEndYM = newSiyum.slice(0, 7)
+          const { data: deleted } = await supabase.from('gviya')
+            .delete()
+            .eq('bochurim_id', form.bochurim_id)
+            .eq('dirot_id', form.dirot_id)
+            .neq('status', 'שולם')
+            .gt('chodesh', newEndYM)
+            .select('id')
+          if (deleted?.length)
+            toast(`נמחקו ${deleted.length} שורות גבייה שהוסרו`)
+        } else if (newEnd > oldEnd) {
+          // הארכת תקופה — יצירת שורות גבייה לחודשים החדשים בלבד
+          const nextMonth = new Date(oldEnd.getFullYear(), oldEnd.getMonth() + 1, 1)
+          const startFrom = nextMonth.toISOString().slice(0, 10)
+          const ola = data.ola_lebach ?? manualSplit ?? autoSplit?.split ?? 0
+          await createMonthlyBilling(form.bochurim_id, form.dirot_id, startFrom, newSiyum, ola)
+        }
+      } else if (newSiyum && !oldSiyum) {
+        // לא היה תאריך סיום, עכשיו נוסף — לא יוצרים מחדש, רק אם אין שורות
+        // (createMonthlyBilling כבר בודקת כפילויות, כאן לא עושים כלום)
       }
     }
 

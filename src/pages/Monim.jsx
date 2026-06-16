@@ -162,8 +162,9 @@ export default function Monim() {
     { key:'_consumption',  label:'צריכה',   render:(_,row) => {
       if (row.is_kria_ptika) return <span className="text-slate-300 text-xs">—</span>
       const c = calcConsumption(row.kriah_kodem, row.kriah_nochchi, row.is_kria_ptika)
+      const unit = row.sug === 'חשמל' ? 'קוט״ש' : row.sug === 'מים' ? 'קוב' : row.sug === 'גז' ? 'מ״ק' : ''
       return c !== null
-        ? <span className="font-bold text-teal-700">{c}</span>
+        ? <span className="font-bold text-teal-700">{c} <span className="text-xs font-normal text-slate-400">{unit}</span></span>
         : <span className="text-slate-300">—</span>
     }},
     { key:'taarich', label:'תאריך', render:v => formatDate(v) },
@@ -180,9 +181,9 @@ export default function Monim() {
 
       {/* StatCards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="סה״כ צריכת חשמל" value={`${totalChashmal} יח׳`} icon={Gauge} color="amber"/>
-        <StatCard label="סה״כ צריכת מים"  value={`${totalMayim} יח׳`}   icon={Gauge} color="blue"/>
-        <StatCard label="סה״כ צריכת גז"   value={`${totalGaz} יח׳`}     icon={Gauge} color="red"/>
+        <StatCard label="סה״כ צריכת חשמל" value={`${totalChashmal} קוט״ש`} icon={Gauge} color="amber"/>
+        <StatCard label="סה״כ צריכת מים"  value={`${totalMayim} קוב`}      icon={Gauge} color="blue"/>
+        <StatCard label="סה״כ צריכת גז"   value={`${totalGaz} מ״ק`}        icon={Gauge} color="red"/>
       </div>
 
       {/* Filters */}
@@ -222,9 +223,9 @@ export default function Monim() {
               <thead>
                 <tr className="text-right text-xs text-slate-500 border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-2 font-medium">דירה</th>
-                  <th className="px-4 py-2 font-medium text-amber-600">⚡ חשמל</th>
-                  <th className="px-4 py-2 font-medium text-blue-600">💧 מים</th>
-                  <th className="px-4 py-2 font-medium text-red-500">🔥 גז</th>
+                  <th className="px-4 py-2 font-medium text-amber-600">⚡ חשמל (קוט״ש)</th>
+                  <th className="px-4 py-2 font-medium text-blue-600">💧 מים (קוב)</th>
+                  <th className="px-4 py-2 font-medium text-red-500">🔥 גז (מ״ק)</th>
                 </tr>
               </thead>
               <tbody>
@@ -234,13 +235,13 @@ export default function Monim() {
                       {d.ktovet}{d.ir ? `, ${d.ir}` : ''}
                     </td>
                     <td className="px-4 py-2.5 text-amber-700 font-semibold">
-                      {d['חשמל'] > 0 ? `${d['חשמל']} יח׳` : <span className="text-slate-300">—</span>}
+                      {d['חשמל'] > 0 ? `${d['חשמל']} קוט״ש` : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-2.5 text-blue-700 font-semibold">
-                      {d['מים'] > 0 ? `${d['מים']} יח׳` : <span className="text-slate-300">—</span>}
+                      {d['מים'] > 0 ? `${d['מים']} קוב` : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-2.5 text-red-600 font-semibold">
-                      {d['גז'] > 0 ? `${d['גז']} יח׳` : <span className="text-slate-300">—</span>}
+                      {d['גז'] > 0 ? `${d['גז']} מ״ק` : <span className="text-slate-300">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -248,9 +249,9 @@ export default function Monim() {
               <tfoot>
                 <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold text-sm">
                   <td className="px-4 py-2.5 text-slate-600">סה״כ</td>
-                  <td className="px-4 py-2.5 text-amber-700">{totalChashmal > 0 ? `${totalChashmal} יח׳` : '—'}</td>
-                  <td className="px-4 py-2.5 text-blue-700">{totalMayim > 0 ? `${totalMayim} יח׳` : '—'}</td>
-                  <td className="px-4 py-2.5 text-red-600">{totalGaz > 0 ? `${totalGaz} יח׳` : '—'}</td>
+                  <td className="px-4 py-2.5 text-amber-700">{totalChashmal > 0 ? `${totalChashmal} קוט״ש` : '—'}</td>
+                  <td className="px-4 py-2.5 text-blue-700">{totalMayim > 0 ? `${totalMayim} קוב` : '—'}</td>
+                  <td className="px-4 py-2.5 text-red-600">{totalGaz > 0 ? `${totalGaz} מ״ק` : '—'}</td>
                 </tr>
               </tfoot>
             </table>
