@@ -107,8 +107,8 @@ export default function Dirot() {
     const rMap = {}
     ;(chozimAll ?? []).forEach(c => {
       const from = c.tchilat_schirut?.slice(0,7)
-      const to   = c.sofit_schirut?.slice(0,7)
-      if (from && to && from <= currentYM && to >= currentYM && c.ola_schirut_chodshi) {
+      const to   = c.sofit_schirut?.slice(0,7) ?? '2999-12' // חוזה פתוח ללא תאריך סיום = תמיד פעיל
+      if (from && from <= currentYM && to >= currentYM && c.ola_schirut_chodshi) {
         rMap[c.dirot_id] = c.ola_schirut_chodshi
       }
     })

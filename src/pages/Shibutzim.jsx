@@ -34,12 +34,12 @@ function hebrewMonthLabel(ym) {
   return `${HE_MONTHS[m-1]} ${String(y).slice(2)}`
 }
 
-function getMonthsInRange(start, end) {
+function getMonthsInRange(start, end, maxMonths = 36) {
   if (!start) return []
   const months = []
   const s = new Date(start.slice(0,7) + '-01T12:00:00')
   const e = end ? new Date(end.slice(0,7) + '-01T12:00:00') : new Date(s)
-  while (s <= e) {
+  while (s <= e && months.length < maxMonths) {
     months.push(s.toISOString().slice(0,7))
     s.setMonth(s.getMonth() + 1)
   }
@@ -70,6 +70,7 @@ export default function Shibutzim() {
   const [autoSplit, setAutoSplit]       = useState(null)
   const [bedInfo, setBedInfo]           = useState(null)
   const [capacityInfo, setCapacityInfo] = useState(null) // תפוסה לפי חודש כשיש תאריכים
+  const [calcLoading, setCalcLoading]   = useState(false)
   const [originalSiyum, setOriginalSiyum] = useState(null)
   const [duplicateWarning, setDuplicateWarning] = useState(null) // { address } אם הבחור כבר משובץ
 
@@ -92,7 +93,8 @@ export default function Shibutzim() {
 
   // חישוב אוטומטי של חלק + מידע מיטות (לפי חודש אם יש תאריכים)
   async function calcSplit(dirotId, excludeId, startDate, endDate) {
-    if (!dirotId) { setAutoSplit(null); setBedInfo(null); setCapacityInfo(null); return }
+    if (!dirotId) { setAutoSplit(null); setBedInfo(null); setCapacityInfo(null); setCalcLoading(false); return }
+    setCalcLoading(true)
     const dira = dirot.find(d => d.id === dirotId)
     if (!dira) return
 
@@ -143,6 +145,7 @@ export default function Shibutzim() {
     const total = overlapCount + (form.id ? 0 : 1)
     const split = total > 0 ? Math.round(Number(dira.ola_schirut_chodshi) / total) : 0
     setAutoSplit({ total, split, rent: dira.ola_schirut_chodshi, dateAware: !!startDate })
+    setCalcLoading(false)
     return split
   }
 
@@ -334,42 +337,43 @@ export default function Shibutzim() {
     setSaving(true)
     const isNew = !form.id
 
-    if (isNew) {
-      // ── בדיקת מיטות פנויות לפי חודש ──
-      const dira = dirot.find(d => d.id === form.dirot_id)
-      if (dira?.mispar_mitot) {
-        const { data: existingShibs } = await supabase.from('shibutzim')
-          .select('taarich_tchila, taarich_siyum')
-          .eq('dirot_id', form.dirot_id)
-          .in('status', ['פעיל', 'הסתיים'])
-        const totalMitot = Number(dira.mispar_mitot)
-        if (form.taarich_tchila) {
-          // בדיקה לפי חודשים בטווח הנבחר
-          const rangeMonths = getMonthsInRange(form.taarich_tchila, form.taarich_siyum || form.taarich_tchila)
-          const fullMonth = rangeMonths.find(ym => {
-            const [y, m] = ym.split('-').map(Number)
-            const monthStart = `${ym}-01`
-            const monthEnd   = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`
-            const count = (existingShibs ?? []).filter(s => {
-              const sS = s.taarich_tchila ?? '1900-01-01'
-              const sE = s.taarich_siyum  ?? '2999-12-31'
-              return sS <= monthEnd && sE >= monthStart
-            }).length
-            return count >= totalMitot
-          })
-          if (fullMonth) {
-            toast(`הדירה מלאה בחודש ${hebrewMonthLabel(fullMonth)} — ${totalMitot}/${totalMitot} מיטות תפוסות`, 'error')
-            setSaving(false); return
-          }
-        } else {
-          // אין תאריך — בדיקת תפוסה נוכחית
-          const occupied = (existingShibs ?? []).filter(s => !s.taarich_siyum || s.taarich_siyum >= new Date().toISOString().slice(0,10)).length
-          if (occupied >= totalMitot) {
-            toast(`אין מיטות פנויות — הדירה מלאה (${occupied}/${totalMitot})`, 'error')
-            setSaving(false); return
-          }
+    // ── בדיקת מיטות פנויות לפי חודש (גם בשיבוץ חדש וגם בעריכה) ──
+    const dira = dirot.find(d => d.id === form.dirot_id)
+    if (dira?.mispar_mitot) {
+      const { data: existingShibs } = await supabase.from('shibutzim')
+        .select('taarich_tchila, taarich_siyum')
+        .eq('dirot_id', form.dirot_id)
+        .in('status', ['פעיל', 'הסתיים'])
+        .neq('id', form.id ?? '00000000-0000-0000-0000-000000000000')
+      const totalMitot = Number(dira.mispar_mitot)
+      if (form.taarich_tchila) {
+        const rangeMonths = getMonthsInRange(form.taarich_tchila, form.taarich_siyum || form.taarich_tchila)
+        const fullMonth = rangeMonths.find(ym => {
+          const [y, m] = ym.split('-').map(Number)
+          const monthStart = `${ym}-01`
+          const monthEnd   = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`
+          const count = (existingShibs ?? []).filter(s => {
+            const sS = s.taarich_tchila ?? '1900-01-01'
+            const sE = s.taarich_siyum  ?? '2999-12-31'
+            return sS <= monthEnd && sE >= monthStart
+          }).length
+          return count >= totalMitot
+        })
+        if (fullMonth) {
+          toast(`הדירה מלאה בחודש ${hebrewMonthLabel(fullMonth)} — ${totalMitot}/${totalMitot} מיטות תפוסות`, 'error')
+          setSaving(false); return
+        }
+      } else if (isNew) {
+        // אין תאריך ושיבוץ חדש — בדיקת תפוסה נוכחית
+        const occupied = (existingShibs ?? []).filter(s => !s.taarich_siyum || s.taarich_siyum >= new Date().toISOString().slice(0,10)).length
+        if (occupied >= totalMitot) {
+          toast(`אין מיטות פנויות — הדירה מלאה (${occupied}/${totalMitot})`, 'error')
+          setSaving(false); return
         }
       }
+    }
+
+    if (isNew) {
 
       // ── בדיקת שיבוץ כפול ──
       const { data: existingShib } = await supabase.from('shibutzim')
@@ -764,7 +768,49 @@ export default function Shibutzim() {
         )}
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={()=>setModal(false)}>ביטול</Button>
-          <Button loading={saving} onClick={save}>שמור</Button>
+          <Button
+            loading={saving || calcLoading}
+            disabled={capacityInfo?.hasFullMonth}
+            title={capacityInfo?.hasFullMonth ? 'לא ניתן לשמור — יש חודשים עם תפוסה מלאה' : undefined}
+            onClick={save}
+          >שמור</Button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+            <Input type="number" min="1" max="60" placeholder="לדוגמה: 4"
+              value={form.mispar_chodashim??''} onChange={set('mispar_chodashim')}/>
+          </FormField>
+          <FormField label="תאריך סיום">
+            <Input type="date" value={form.taarich_siyum??''}
+              min={form.taarich_tchila || dirot.find(d=>d.id===form.dirot_id)?.tchilat_schirut || undefined}
+              max={dirot.find(d=>d.id===form.dirot_id)?.sofit_schirut ?? undefined}
+              onChange={e => {
+                const val = e.target.value
+                setForm(f => ({ ...f, taarich_siyum: val }))
+                if (form.dirot_id && form.taarich_tchila) {
+                  calcSplit(form.dirot_id, form.id, form.taarich_tchila, val)
+                }
+              }}/>
+          </FormField>
+        </div>
+        <div className="mt-4">
+          <FormField label="הערה"><Textarea value={form.heara??''} onChange={e=>setForm(f=>({...f,heara:e.target.value}))}/></FormField>
+        </div>
+        {!form.id && (
+          <p className="text-xs text-teal-600 mt-3 bg-teal-50 rounded-lg p-2">
+            ✓ שורות גבייה חודשיות יוצרו אוטומטית · חלוקת שכירות תתעדכן לכל הבחורים בדירה
+          </p>
+        )}
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={()=>setModal(false)}>ביטול</Button>
+          <Button
+            loading={saving || calcLoading}
+            disabled={capacityInfo?.hasFullMonth}
+            title={capacityInfo?.hasFullMonth ? 'לא ניתן לשמור — יש חודשים עם תפוסה מלאה' : undefined}
+            onClick={save}
+          >שמור</Button>
         </div>
       </Modal>
     </div>
