@@ -213,11 +213,11 @@ export default function Gviya() {
           חודש קודם
         </button>
         {(search || statusFilter || monthFilter) && (
-          <button onClick={clearFilters} className="px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
+          <button onClick={clearFilters} className="h-9 px-3 text-sm rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
             ✕ נקה סינון
           </button>
         )}
-        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
+        <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
           <RefreshCw size={16}/>
         </button>
         <Button variant="secondary" icon={Download}

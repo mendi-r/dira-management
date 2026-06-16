@@ -195,19 +195,19 @@ export default function Tashlumim() {
         <input type="month" value={monthFilter} onChange={e=>setMonthFilter(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400"/>
         <button onClick={()=>setMonthFilter(currentMonth)}
-          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${monthFilter===currentMonth?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
+          className={`h-9 px-3 text-sm rounded-lg border transition-colors ${monthFilter===currentMonth?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
           חודש נוכחי
         </button>
         <button onClick={()=>setMonthFilter(prevMonth)}
-          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${monthFilter===prevMonth?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
+          className={`h-9 px-3 text-sm rounded-lg border transition-colors ${monthFilter===prevMonth?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
           חודש קודם
         </button>
         {(search || statusFilter || monthFilter) && (
-          <button onClick={clearFilters} className="px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
+          <button onClick={clearFilters} className="h-9 px-3 text-sm rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
             ✕ נקה סינון
           </button>
         )}
-        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
+        <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
           <RefreshCw size={16}/>
         </button>
         <Button variant="secondary" icon={Download}

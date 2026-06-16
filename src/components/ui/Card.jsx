@@ -26,22 +26,23 @@ export function CardBody({ children, className = '' }) {
 
 export function StatCard({ label, value, icon: Icon, color = 'teal', sub }) {
   const colors = {
-    teal:   'bg-teal-50 text-teal-600',
-    green:  'bg-emerald-50 text-emerald-600',
-    blue:   'bg-blue-50 text-blue-600',
-    amber:  'bg-amber-50 text-amber-600',
-    red:    'bg-red-50 text-red-600',
-    purple: 'bg-purple-50 text-purple-600',
+    teal:    'bg-teal-50 text-teal-600',
+    green:   'bg-emerald-50 text-emerald-600',
+    blue:    'bg-blue-50 text-blue-600',
+    amber:   'bg-amber-50 text-amber-600',
+    red:     'bg-red-50 text-red-600',
+    purple:  'bg-purple-50 text-purple-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
   }
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center gap-4 min-h-[88px]">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${colors[color]}`}>
-        <Icon size={22} />
+    <div className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-slate-200 flex items-center gap-3 h-[84px] overflow-hidden">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${colors[color] ?? colors.teal}`}>
+        <Icon size={20} />
       </div>
-      <div>
-        <p className="text-2xl font-bold text-slate-800">{value}</p>
-        <p className="text-sm text-slate-500">{label}</p>
-        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      <div className="flex-1 min-w-0">
+        <p className="text-xl font-bold text-slate-800 leading-tight truncate">{value}</p>
+        <p className="text-sm text-slate-500 leading-tight truncate">{label}</p>
+        {sub && <p className="text-[11px] text-slate-400 leading-tight truncate mt-0.5">{sub}</p>}
       </div>
     </div>
   )

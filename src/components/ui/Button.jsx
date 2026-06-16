@@ -14,7 +14,7 @@ export default function Button({ children, variant = 'primary', loading, icon: I
       {...props}
       disabled={loading || props.disabled}
       className={`
-        inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+        inline-flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-medium
         transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-1
         disabled:opacity-50 disabled:cursor-not-allowed
         ${variants[variant]} ${className}

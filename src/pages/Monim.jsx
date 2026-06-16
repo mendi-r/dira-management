@@ -202,7 +202,7 @@ export default function Monim() {
           <option value="">כל הדירות</option>
           {dirot.map(d => <option key={d.id} value={d.id}>{d.ktovet}</option>)}
         </select>
-        <button onClick={() => load()} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן">
+        <button onClick={() => load()} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
           <RefreshCw size={16}/>
         </button>
         <Button icon={PlusCircle} onClick={openNew}>קריאה חדשה</Button>

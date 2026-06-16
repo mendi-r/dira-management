@@ -10,7 +10,7 @@ export default function SearchInput({ value, onChange, placeholder = 'חיפוש
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full pr-9 pl-8 py-2 text-sm rounded-lg border border-slate-200 bg-white
+        className="w-full h-9 pr-9 pl-8 text-sm rounded-lg border border-slate-200 bg-white
                    focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent"
       />
       {value && (

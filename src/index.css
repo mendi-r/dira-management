@@ -67,3 +67,21 @@ body {
   background-color: #f0fdfa;
   transition: background-color 0.15s;
 }
+
+/* ─── אחידות גובה אלמנטים אינטראקטיביים (36px) ─── */
+/* מכסה את כל ה-<select> וה-<input> שלא דרך הקומפוננטים */
+select,
+input[type="month"],
+input[type="date"],
+input[type="number"],
+input[type="text"],
+input[type="email"],
+input[type="search"],
+input[type="tel"],
+input[type="url"] {
+  height: 36px;
+  box-sizing: border-box;
+}
+textarea {
+  height: auto; /* לבטל את ה-override על textarea */
+}
