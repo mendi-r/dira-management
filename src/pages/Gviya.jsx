@@ -10,7 +10,6 @@ import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
-import AlertBanner from '../components/ui/AlertBanner'
 import { StatCard } from '../components/ui/Card'
 import { useToast } from '../components/ui/Toast'
 
@@ -44,11 +43,11 @@ export default function Gviya() {
   const [form, setForm]         = useState(EMPTY)
   const [saving, setSaving]     = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     let q = supabase.from('gviya')
       .select('*, bochurim!bochurim_id(shem,mishpacha,telefon,amla_chodshit), dirot!dirot_id(ktovet,ir)')
-      .order('taarich', { ascending: false })
+      .order('taarich', { ascending: true })
     if (statusFilter) q = q.eq('status', statusFilter)
     if (monthFilter)  q = q.eq('chodesh', monthFilter)
     const [{ data:g },{ data:b },{ data:d }] = await Promise.all([
@@ -101,13 +100,13 @@ export default function Gviya() {
     setSaving(false)
     if (error) { toast(error.message,'error'); return }
     toast(isNew ? 'נוסף' : 'עודכן')
-    setModal(false); load()
+    setModal(false); load(true)
   }
 
   async function remove(id) {
     if (!confirm('למחוק?')) return
     await supabase.from('gviya').delete().eq('id', id)
-    toast('נמחק'); load()
+    toast('נמחק'); load(true)
   }
 
   async function togglePaid(row) {
@@ -119,7 +118,12 @@ export default function Gviya() {
     ).eq('id', row.id)
     if (error) { toast(error.message, 'error'); return }
     toast(isFullyPaid ? 'סומן כלא שולם' : 'סומן כשולם ✓')
-    load()
+    load(true)
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0)
+  function isOverdue(row) {
+    return row.status !== 'שולם' && row.taarich && new Date(row.taarich) < today
   }
 
   function clearFilters() {
@@ -181,20 +185,11 @@ export default function Gviya() {
         <StatCard label="אחוז גבייה"  value={`${pct}%`}             icon={TrendingUp} color="blue" sub={`${filtered.length} רשומות`}/>
       </div>
 
-      {/* Overdue alerts */}
+      {/* חיובים באיחור — ספירה קטנה */}
       {overdue.length > 0 && (
-        <AlertBanner type="error" title={`${overdue.length} חיובים באיחור`}>
-          <ul className="mt-1 space-y-0.5 text-xs">
-            {overdue.slice(0,5).map(r=>(
-              <li key={r.id} className="flex items-center gap-2">
-                {r.bochurim?.shem} {r.bochurim?.mishpacha} — {currency(Number(r.skhum)-Number(r.skhum_shulam??0))} — {formatDate(r.taarich)}
-                {r.bochurim?.telefon && (
-                  <WhatsAppTemplate phone={r.bochurim.telefon} message={buildWaMessage(r)}/>
-                )}
-              </li>
-            ))}
-          </ul>
-        </AlertBanner>
+        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+          {overdue.length} חיובים באיחור — מסומנים באדום בטבלה
+        </div>
       )}
 
       {/* Filters */}
@@ -242,7 +237,8 @@ export default function Gviya() {
       </div>
 
       <p className="text-sm text-slate-400">{filtered.length} רשומות</p>
-      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}/>
+      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}
+        rowClassName={row => isOverdue(row) ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}/>
 
       {/* Form Modal */}
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id?'עריכת חיוב':'חיוב חדש'} size="lg">

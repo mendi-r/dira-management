@@ -66,21 +66,35 @@ export default function CalendarPage() {
     ;(shibutzim??[]).forEach(s => {
       if (s.taarich_siyum) add(s.taarich_siyum, {
         type:'shibutz_end',
+        title:`${s.bochurim?.shem??''} ${s.bochurim?.mishpacha??''}`.trim(),
+        subtitle: s.dirot?.ktovet ?? '',
         label:`${s.bochurim?.shem??''} ${s.bochurim?.mishpacha??''} — ${s.dirot?.ktovet??''}`,
         id: s.id, nav: '/shibutzim',
       })
     })
     ;(dirot??[]).forEach(d => {
       if (d.sofit_schirut) add(d.sofit_schirut, {
-        type:'contract_end', label:`חוזה: ${d.ktovet}`, id:d.id, nav:'/dirot',
+        type:'contract_end',
+        title: d.ktovet ?? '',
+        subtitle: null,
+        label:`חוזה: ${d.ktovet}`,
+        id:d.id, nav:'/dirot',
       })
       if (d.bituach_chadush) add(d.bituach_chadush, {
-        type:'insurance', label:`ביטוח: ${d.ktovet}`, id:d.id, nav:'/dirot',
+        type:'insurance',
+        title: d.ktovet ?? '',
+        subtitle: null,
+        label:`ביטוח: ${d.ktovet}`,
+        id:d.id, nav:'/dirot',
       })
     })
     ;(bochurim??[]).forEach(b => {
       if (b.tokef_viza) add(b.tokef_viza, {
-        type:'visa_expiry', label:`ויזה: ${b.shem??''} ${b.mishpacha??''}`, id:b.id, nav:'/bochurim',
+        type:'visa_expiry',
+        title:`${b.shem??''} ${b.mishpacha??''}`.trim(),
+        subtitle: null,
+        label:`ויזה: ${b.shem??''} ${b.mishpacha??''}`,
+        id:b.id, nav:'/bochurim',
       })
     })
 
@@ -183,11 +197,12 @@ export default function CalendarPage() {
               return (
                 <div key={i}
                   onClick={() => navigate(ev.nav)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:opacity-80 ${t.color}`}>
-                  <Icon size={16}/>
-                  <div>
-                    <p className="text-sm font-medium">{ev.label}</p>
-                    <p className="text-xs opacity-70">{t.label}</p>
+                  className={`flex items-start gap-3 px-3 py-3 rounded-xl cursor-pointer hover:opacity-80 ${t.color}`}>
+                  <div className="mt-0.5"><Icon size={16}/></div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">{t.label}</span>
+                    <p className="text-sm font-semibold leading-tight mt-0.5">{ev.title || ev.label}</p>
+                    {ev.subtitle && <p className="text-xs opacity-70 mt-0.5">{ev.subtitle}</p>}
                   </div>
                 </div>
               )

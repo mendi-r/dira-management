@@ -49,8 +49,8 @@ export default function Tachzuka() {
   const [vendorForm, setVendorForm]   = useState(EMPTY_V)
   const [vSaving, setVSaving]         = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     let q = supabase.from('tachzuka')
       .select('*, dirot(ktovet,ir)')
       .order('created_at', { ascending: false })
@@ -108,7 +108,7 @@ export default function Tachzuka() {
     logActivity(isNew?'INSERT':'UPDATE','tachzuka',data.id,form.teur)
     toast(isNew?'קריאה נוספה':'עודכן')
     if (isNew) { setForm(f=>({...f,id:data.id})); setActiveTab('pritim') }
-    load()
+    load(true)
   }
 
   async function addPritat() {
@@ -131,7 +131,7 @@ export default function Tachzuka() {
   async function remove(id) {
     if (!confirm('למחוק קריאה?')) return
     await supabase.from('tachzuka').delete().eq('id', id)
-    toast('נמחק'); load()
+    toast('נמחק'); load(true)
   }
 
   // Vendor CRUD
@@ -146,7 +146,7 @@ export default function Tachzuka() {
       : await supabase.from('vendors').update(payload).eq('id', vendorForm.id)
     setVSaving(false)
     if (error) { toast(error.message,'error'); return }
-    toast(isNew?'ספק נוסף':'עודכן'); setVendorModal(false); load()
+    toast(isNew?'ספק נוסף':'עודכן'); setVendorModal(false); load(true)
   }
 
   const totalCost = pritim.reduce((s,p) => s + Number(p.skhum??0), 0)
@@ -347,7 +347,7 @@ export default function Tachzuka() {
               </tbody>
             </table>
           </div>
-        </div>
+                </div>
       </Modal>
     </div>
   )

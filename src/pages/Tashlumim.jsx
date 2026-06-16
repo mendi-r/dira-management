@@ -39,11 +39,16 @@ export default function Tashlumim() {
   const [form, setForm]       = useState(EMPTY)
   const [saving, setSaving]   = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const today = new Date(); today.setHours(0,0,0,0)
+  function isOverdue(row) {
+    return row.status !== 'שולם' && row.taarich && new Date(row.taarich) < today
+  }
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     let q = supabase.from('tashlumim_baalim')
       .select('*, dirot(ktovet,ir,baalim_shem,baalim_telefon1)')
-      .order('taarich', { ascending: false })
+      .order('taarich', { ascending: true })
     if (statusFilter) q = q.eq('status', statusFilter)
     if (monthFilter)  q = q.eq('chodesh', monthFilter)
     const [{ data: t }, { data: d }] = await Promise.all([
@@ -106,13 +111,13 @@ export default function Tashlumim() {
     setSaving(false)
     if (error) { toast(error.message, 'error'); return }
     toast(isNew ? 'נוסף' : 'עודכן')
-    setModal(false); load()
+    setModal(false); load(true)
   }
 
   async function remove(id) {
     if (!confirm('למחוק תשלום זה?')) return
     await supabase.from('tashlumim_baalim').delete().eq('id', id)
-    toast('נמחק'); load()
+    toast('נמחק'); load(true)
   }
 
   async function togglePaid(row) {
@@ -124,7 +129,7 @@ export default function Tashlumim() {
     ).eq('id', row.id)
     if (error) { toast(error.message, 'error'); return }
     toast(isFullyPaid ? 'סומן כלא שולם' : 'שולם ✓')
-    load()
+    load(true)
   }
 
   function clearFilters() {
@@ -221,7 +226,8 @@ export default function Tashlumim() {
       </div>
 
       <p className="text-sm text-slate-400">{filtered.length} רשומות</p>
-      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}/>
+      <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו רשומות" onRowClick={openEdit}
+        rowClassName={row => isOverdue(row) ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}/>
 
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id ? 'עריכת תשלום' : 'תשלום חדש לבעלים'} size="lg">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

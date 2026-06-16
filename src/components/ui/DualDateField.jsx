@@ -206,15 +206,10 @@ export default function DualDateField({ value, onChange, required, disabled }) {
             focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:bg-slate-50"/>
       )}
 
-      {/* הצגה כפולה */}
-      {value && (
+      {/* הצגה כפולה — רק במצב הנגדי */}
+      {value && hebrewMode && (
         <div className="px-1">
-          {!hebrewMode && hebrewDisplay && (
-            <span className="text-xs text-teal-600 font-medium">{hebrewDisplay}</span>
-          )}
-          {hebrewMode && value && (
-            <span className="text-xs text-slate-500">{value.split('-').reverse().join('/')}</span>
-          )}
+          <span className="text-xs text-slate-500">{value.split('-').reverse().join('/')}</span>
         </div>
       )}
 

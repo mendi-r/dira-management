@@ -61,8 +61,8 @@ export default function Bochurim() {
   const [history, setHistory]   = useState([])
   const [alerts, setAlerts]     = useState([])
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     let q = supabase.from('bochurim').select('*').order('shem')
     if (statusFilter) q = q.eq('status', statusFilter)
     const { data } = await q
@@ -128,7 +128,7 @@ export default function Bochurim() {
     logActivity(isNew ? 'INSERT' : 'UPDATE', 'bochurim', data.id, `${form.shem} ${form.mishpacha}`)
     toast(isNew ? 'בחור נוסף בהצלחה' : 'עודכן בהצלחה')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
-    load()
+    load(true)
   }
 
   async function remove(id, name) {
@@ -136,7 +136,7 @@ export default function Bochurim() {
     await supabase.from('bochurim').delete().eq('id', id)
     logActivity('DELETE', 'bochurim', id, name)
     toast('נמחק')
-    load()
+    load(true)
   }
 
   // Visa status helper

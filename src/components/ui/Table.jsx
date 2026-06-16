@@ -1,7 +1,7 @@
 import React from 'react'
 import { Loader2 } from 'lucide-react'
 
-export function Table({ columns, data, loading, emptyText = 'אין נתונים', onRowClick }) {
+export function Table({ columns, data, loading, emptyText = 'אין נתונים', onRowClick, rowClassName }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table className="w-full text-sm table-hover">
@@ -36,7 +36,7 @@ export function Table({ columns, data, loading, emptyText = 'אין נתונים
               <tr
                 key={row.id ?? i}
                 onClick={() => onRowClick?.(row)}
-                className={`border-b border-slate-100 last:border-0 ${onRowClick ? 'cursor-pointer' : ''}`}
+                className={`border-b border-slate-100 last:border-0 ${onRowClick ? 'cursor-pointer' : ''} ${rowClassName ? rowClassName(row) : ''}`}
               >
                 {columns.map((col) => (
                   <td key={col.key} className="px-4 py-3 text-slate-700">

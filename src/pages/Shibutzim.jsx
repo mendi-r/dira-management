@@ -50,11 +50,11 @@ export default function Shibutzim() {
   const [saving, setSaving]     = useState(false)
   const [autoSplit, setAutoSplit] = useState(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     let q = supabase.from('shibutzim')
       .select('*, bochurim!bochurim_id(shem,mishpacha,telefon), dirot!dirot_id(ktovet,ir,ola_schirut_chodshi,mispar_mitot)')
-      .order('taarich_tchila', { ascending: false })
+      .order('taarich_tchila', { ascending: true })
     if (statusFilter) q = q.eq('status', statusFilter)
     const [{ data:s },{ data:b },{ data:d }] = await Promise.all([
       q,
@@ -190,22 +190,22 @@ export default function Shibutzim() {
     setSaving(false)
     toast(isNew ? 'שיבוץ נוסף' : 'עודכן')
     setModal(false)
-    load()
+    load(true)
   }
 
   async function remove(id) {
     if (!confirm('למחוק שיבוץ זה?')) return
     await supabase.from('shibutzim').delete().eq('id', id)
     toast('נמחק')
-    load()
+    load(true)
   }
 
   async function endAssignment(row) {
     if (!confirm('לסיים שיבוץ זה?')) return
-    const today = new Date().toISOString().slice(0,10)
-    await supabase.from('shibutzim').update({ status:'הסתיים', taarich_siyum: today }).eq('id', row.id)
+    const todayStr = new Date().toISOString().slice(0,10)
+    await supabase.from('shibutzim').update({ status:'הסתיים', taarich_siyum: todayStr }).eq('id', row.id)
     toast('השיבוץ הסתיים')
-    load()
+    load(true)
   }
 
   const columns = [

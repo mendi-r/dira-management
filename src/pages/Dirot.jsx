@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, MapPin, ExternalLink, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, calcLeaseEnd, daysUntil, currency, logActivity } from '../lib/utils'
+import { toHebrewDate } from '../components/ui/DualDateField'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
 import Modal from '../components/ui/Modal'
@@ -66,8 +67,8 @@ export default function Dirot() {
   const [history, setHistory]   = useState([])
   const [alerts, setAlerts]     = useState([])
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     let q = supabase.from('dirot').select('*').order('ktovet')
     if (statusFilter) q = q.eq('status', statusFilter)
     const [{ data }, { data: activeShibutzim }] = await Promise.all([
@@ -202,7 +203,7 @@ export default function Dirot() {
 
     toast(isNew ? 'דירה נוספה' : 'עודכן')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
-    load()
+    load(true)
   }
 
   /** יצירת שורות תשלום לבעלים לכל חודשי השכירות */
@@ -240,7 +241,7 @@ export default function Dirot() {
     await supabase.from('dirot').delete().eq('id', id)
     logActivity('DELETE', 'dirot', id, addr)
     toast('נמחק')
-    load()
+    load(true)
   }
 
   const columns = [
@@ -409,14 +410,21 @@ export default function Dirot() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <FormField label="עלות שכירות חודשית (₪)"><Input type="number" min="0" value={form.ola_schirut_chodshi??''} onChange={set('ola_schirut_chodshi')}/></FormField>
             <div/>
-            <FormField label="תחילת שכירות">
-              <DualDateField value={form.tchilat_schirut??''} onChange={v=>{ set('tchilat_schirut')({target:{value:v}}) }}/>
-            </FormField>
-            <FormField label="מספר חודשים"><Input type="number" min="1" value={form.mispar_chodashim??''} onChange={set('mispar_chodashim')} placeholder="12"/></FormField>
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+              <FormField label="תחילת שכירות">
+                <DualDateField value={form.tchilat_schirut??''} onChange={v=>{ set('tchilat_schirut')({target:{value:v}}) }}/>
+              </FormField>
+              <FormField label="מספר חודשים">
+                <Input type="number" min="1" value={form.mispar_chodashim??''} onChange={set('mispar_chodashim')} placeholder="12"/>
+              </FormField>
+            </div>
             <FormField label="סוף שכירות (מחושב)">
               <div className="px-3 py-2 bg-teal-50 rounded-lg text-teal-700 text-sm font-medium">
                 {form.sofit_schirut ? formatDate(form.sofit_schirut) : '—'}
               </div>
+              {form.sofit_schirut && (
+                <p className="text-xs text-slate-400 mt-1 px-1">{toHebrewDate(form.sofit_schirut)}</p>
+              )}
             </FormField>
             <div/>
             <hr className="sm:col-span-2 border-slate-100"/>
