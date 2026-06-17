@@ -1061,6 +1061,5 @@ export default function Dirot() {
       </Modal>
 
       </div>
-     </>
   )
 }
