@@ -33,7 +33,10 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const currentMonth = new Date().toISOString().slice(0,7) // YYYY-MM
+    // שעון ישראל
+    const currentMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' }).slice(0,7)
+    const [cy, cm] = currentMonth.split('-').map(Number)
+    const nextMonth = cm === 12 ? `${cy+1}-01` : `${cy}-${String(cm+1).padStart(2,'0')}`
 
     const [
       { count: bochurimCount },
@@ -62,7 +65,7 @@ export default function Dashboard() {
       supabase.from('tashlumim_baalim').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
       supabase.from('riut').select('sug_mone,skhum_leshalem,dirot_id')
         .gte('taarich_kriah', `${currentMonth}-01`)
-        .lte('taarich_kriah', `${currentMonth}-31`)
+        .lt('taarich_kriah', `${nextMonth}-01`)
         .eq('is_kriah_ptika', false),
     ])
 
