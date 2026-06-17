@@ -140,7 +140,7 @@ export default function Monim() {
   useEffect(() => {
     if (!modal || form.is_kriah_ptika || consumption == null) return
     const key = PRICE_KEYS[form.sug_mone]
-    if (!key || !prices[key]) return
+    if (!key || prices[key] == null || prices[key] === '') return
     const skhum = (consumption * Number(prices[key])).toFixed(2)
     setForm(f => ({ ...f, skhum_leshalem: skhum }))
   }, [consumption, form.sug_mone, form.is_kriah_ptika, modal, prices])
@@ -184,14 +184,24 @@ export default function Monim() {
     })
   })()
 
-  function openNew() {
+  async function openNew() {
+    const { data: hag } = await supabase.from('hagdarot').select('mafteach,erech')
+      .in('mafteach', ['PRICE_HASHMAL','PRICE_MAYIM','PRICE_GAZ'])
+    const pm = {}
+    ;(hag ?? []).forEach(h => { pm[h.mafteach] = h.erech })
+    setPrices(pm)
     setForm({ ...EMPTY, taarich_kriah: new Date().toISOString().slice(0, 10) })
     setPrevReading(null)
     setChartData([])
     setModal(true)
   }
 
-  function openEdit(r) {
+  async function openEdit(r) {
+    const { data: hag } = await supabase.from('hagdarot').select('mafteach,erech')
+      .in('mafteach', ['PRICE_HASHMAL','PRICE_MAYIM','PRICE_GAZ'])
+    const pm = {}
+    ;(hag ?? []).forEach(h => { pm[h.mafteach] = h.erech })
+    setPrices(pm)
     setForm({ ...EMPTY, ...r, taarich_kriah: toInputDate(r.taarich_kriah) })
     fetchPrevReading(r.dirot_id, r.sug_mone, r.id, false)
     loadChart(r.dirot_id, r.sug_mone)
