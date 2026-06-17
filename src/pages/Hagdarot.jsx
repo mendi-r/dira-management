@@ -335,4 +335,14 @@ export default function Hagdarot() {
             <Input value={form.sug ?? ''} onChange={e => setForm(f => ({ ...f, sug: e.target.value }))} placeholder="כללי"/>
           </FormField>
           <FormField label="תיאור">
-            <Textarea value={form.teur ?? ''} onChange={e => setForm(f => ({ ...f, teur: e.target.value }))} placeho
+            <Textarea value={form.teur ?? ''} onChange={e => setForm(f => ({ ...f, teur: e.target.value }))} placeholder="תיאור ההגדרה..." rows={2}/>
+          </FormField>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
+          <Button loading={saving} onClick={save}>שמור</Button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
