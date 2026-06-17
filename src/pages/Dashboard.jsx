@@ -60,7 +60,7 @@ export default function Dashboard() {
         .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
       supabase.from('gviya').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
       supabase.from('tashlumim_baalim').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
-      supabase.from('monim').select('sug_mone,skhum_leshalem,dirot_id')
+      supabase.from('riut').select('sug_mone,skhum_leshalem,dirot_id')
         .gte('taarich_kriah', `${currentMonth}-01`)
         .lte('taarich_kriah', `${currentMonth}-31`)
         .eq('is_kriah_ptika', false),

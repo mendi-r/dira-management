@@ -21,7 +21,7 @@ export default function Reports() {
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [data,  setData]  = useState(null)
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useState('monthly') // 'monthly' | 'annual' | 'forecast' | 'ranking' | 'baalim'
+  const [view, setView] = useState(() => sessionStorage.getItem('reports_view') ?? 'monthly')
 
   // דוח בעלים
   const [dirotList,    setDirotList]    = useState([])
@@ -111,7 +111,7 @@ export default function Reports() {
       { data: tashlumim },
       { data: dira },
     ] = await Promise.all([
-      supabase.from('monim').select('sug_mone,skhum_leshalem,taarich_kriah')
+      supabase.from('riut').select('sug_mone,skhum_leshalem,taarich_kriah')
         .eq('dirot_id', baalimDira).eq('is_kriah_ptika', false)
         .gte('taarich_kriah', yearStart).lte('taarich_kriah', yearEnd),
       supabase.from('tashlumim_baalim').select('skhum,skhum_shulam,chodesh')
@@ -187,7 +187,7 @@ export default function Reports() {
         </FormField>
         <div className="flex gap-2">
           {['monthly','annual','forecast','ranking','baalim'].map(v=>(
-            <button key={v} onClick={()=>setView(v)}
+            <button key={v} onClick={()=>{ setView(v); sessionStorage.setItem('reports_view', v) }}
               className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors
                 ${view===v?'bg-teal-600 text-white':'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
               {v==='monthly'?'חודשי':v==='annual'?'שנתי':v==='forecast'?'תחזית':v==='ranking'?'דירוג':'דוח בעלים'}

@@ -75,9 +75,9 @@ export default function Monim() {
   const [prices, setPrices]           = useState({})
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
-  const [sugFilter, setSugFilter]     = useState(searchParams.get('sug') ?? '')
-  const [dirotFilter, setDirotFilter] = useState('')
-  const [shulamFilter, setShulamFilter] = useState('')
+  const [sugFilter, setSugFilter]       = useState(searchParams.get('sug') ?? sessionStorage.getItem('monim_sug') ?? '')
+  const [dirotFilter, setDirotFilter]   = useState(sessionStorage.getItem('monim_dira') ?? '')
+  const [shulamFilter, setShulamFilter] = useState(sessionStorage.getItem('monim_shulam') ?? '')
   const [modal, setModal]             = useState(false)
   const [form, setForm]               = useState(EMPTY)
   const [saving, setSaving]           = useState(false)
@@ -354,27 +354,27 @@ export default function Monim() {
 
         {/* כפתורי סינון סוג מונה */}
         <button
-          onClick={() => setSugFilter(f => f === 'חשמל' ? '' : 'חשמל')}
-          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter === 'חשמל' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600'}`}>
+          onClick={() => { const v = sugFilter==='חשמל'?'':'חשמל'; setSugFilter(v); sessionStorage.setItem('monim_sug',v) }}
+          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter==='חשמל'?'bg-amber-500 text-white border-amber-500':'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600'}`}>
           ⚡ חשמל
         </button>
         <button
-          onClick={() => setSugFilter(f => f === 'מים' ? '' : 'מים')}
-          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter === 'מים' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'}`}>
+          onClick={() => { const v = sugFilter==='מים'?'':'מים'; setSugFilter(v); sessionStorage.setItem('monim_sug',v) }}
+          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter==='מים'?'bg-blue-500 text-white border-blue-500':'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'}`}>
           💧 מים
         </button>
         <button
-          onClick={() => setSugFilter(f => f === 'גז' ? '' : 'גז')}
-          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter === 'גז' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300 hover:text-orange-600'}`}>
+          onClick={() => { const v = sugFilter==='גז'?'':'גז'; setSugFilter(v); sessionStorage.setItem('monim_sug',v) }}
+          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter==='גז'?'bg-orange-500 text-white border-orange-500':'bg-white text-slate-600 border-slate-200 hover:border-orange-300 hover:text-orange-600'}`}>
           🔥 גז
         </button>
 
-        <select value={dirotFilter} onChange={e => setDirotFilter(e.target.value)}
+        <select value={dirotFilter} onChange={e => { setDirotFilter(e.target.value); sessionStorage.setItem('monim_dira', e.target.value) }}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
           <option value="">כל הדירות</option>
           {dirot.map(d => <option key={d.id} value={d.id}>{d.ktovet}</option>)}
         </select>
-        <select value={shulamFilter} onChange={e => setShulamFilter(e.target.value)}
+        <select value={shulamFilter} onChange={e => { setShulamFilter(e.target.value); sessionStorage.setItem('monim_shulam', e.target.value) }}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
           <option value="">כל הסטטוסים</option>
           <option value="שולם">שולם</option>
@@ -384,7 +384,10 @@ export default function Monim() {
         {/* איפוס סינונים */}
         {(search || sugFilter || dirotFilter || shulamFilter) && (
           <button
-            onClick={() => { setSearch(''); setSugFilter(''); setDirotFilter(''); setShulamFilter('') }}
+            onClick={() => {
+              setSearch(''); setSugFilter(''); setDirotFilter(''); setShulamFilter('')
+              sessionStorage.removeItem('monim_sug'); sessionStorage.removeItem('monim_dira'); sessionStorage.removeItem('monim_shulam')
+            }}
             className="h-9 px-3 text-sm rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
             ✕ נקה סינון
           </button>
