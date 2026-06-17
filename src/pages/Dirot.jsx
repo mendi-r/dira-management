@@ -1057,12 +1057,10 @@ export default function Dirot() {
             <Button variant="secondary" onClick={() => setRenewModal(false)}>ביטול</Button>
             <Button loading={renewSaving} onClick={renewContract}>חדש חוזה</Button>
           </div>
-        </Modal>
+        </div>
+      </Modal>
 
       </div>
-    </>
-  )
-}
-v>
+     </>
   )
 }

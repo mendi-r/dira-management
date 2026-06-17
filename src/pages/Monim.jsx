@@ -347,7 +347,6 @@ export default function Monim() {
             </Select>
           </FormField>
 
-          {/* קריאת פתיחה */}
           <div className="sm:col-span-2 flex items-center gap-2">
             <input type="checkbox" id="is_kriah_ptika" checked={!!form.is_kriah_ptika}
               onChange={e => setField('is_kriah_ptika', e.target.checked)}
@@ -357,7 +356,6 @@ export default function Monim() {
             </label>
           </div>
 
-          {/* קריאה קודמת אוטומטית */}
           {!form.is_kriah_ptika && prevReading && (
             <div className="sm:col-span-2 flex items-center gap-3 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm">
               <Gauge size={15} className="text-blue-500 flex-shrink-0"/>
@@ -388,7 +386,6 @@ export default function Monim() {
               onChange={e => setField('taarich_kriah', e.target.value)}/>
           </FormField>
 
-          {/* צריכה מחושבת */}
           {!form.is_kriah_ptika && consumption != null && (
             <div className={`sm:col-span-2 flex items-center gap-3 px-4 py-3 rounded-xl border ${
               consumption >= 0 ? 'bg-teal-50 border-teal-200' : 'bg-red-50 border-red-200'
@@ -422,7 +419,6 @@ export default function Monim() {
           </FormField>
         </div>
 
-        {/* גרף צריכה */}
         {chartData.length >= 2 && (
           <div className="mt-4 pt-4 border-t border-slate-100">
             <p className="text-sm font-semibold text-slate-700 mb-2">
@@ -434,6 +430,13 @@ export default function Monim() {
 
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
+          <Button loading={saving} onClick={save}>שמור</Button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+dary" onClick={() => setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
         </div>
       </Modal>
