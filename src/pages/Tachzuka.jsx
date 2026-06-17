@@ -52,17 +52,19 @@ export default function Tachzuka() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
+    // select('*') בלי join — join client-side כדי למנוע שגיאות FK
     let q = supabase.from('tachzuka')
-      .select('*, dirot(ktovet,ir)')
-      .order('created_at', { ascending: false })
-    if (statusFilter)  q = q.eq('status', statusFilter)
-    if (adifutFilter)  q = q.eq('adifut', adifutFilter)
-    const [{ data:t },{ data:d },{ data:v }] = await Promise.all([
+      .select('*')
+      .order('id', { ascending: false })
+    if (statusFilter) q = q.eq('status', statusFilter)
+    if (adifutFilter) q = q.eq('adifut', adifutFilter)
+    const [{ data: t, error: tErr }, { data: d }, { data: v }] = await Promise.all([
       q,
       supabase.from('dirot').select('id,ktovet,ir').order('ktovet'),
       supabase.from('vendors').select('*').order('shem'),
     ])
-    setRows(t??[]); setDirot(d??[]); setVendors(v??[])
+    if (tErr) console.error('tachzuka load error:', tErr)
+    setRows(t ?? []); setDirot(d ?? []); setVendors(v ?? [])
     setLoading(false)
   }, [statusFilter, adifutFilter])
 
@@ -75,8 +77,14 @@ export default function Tachzuka() {
     setPritim(data??[])
   }
 
+  // client-side: מחפש כתובת דירה מהמערך המקומי
+  function getDiraLabel(dirotId) {
+    const d = dirot.find(d => d.id === dirotId)
+    return d ? `${d.ktovet}${d.ir ? ', ' + d.ir : ''}` : '—'
+  }
+
   const filtered = rows.filter(r =>
-    `${r.teur??''} ${r.sug??''} ${r.assigned_to??''} ${r.dirot?.ktovet??''} ${r.makom_bedira??''}`
+    `${r.teur??''} ${r.sug??''} ${r.assigned_to??''} ${getDiraLabel(r.dirot_id)} ${r.makom_bedira??''}`
       .toLowerCase().includes(search.toLowerCase())
   )
 
@@ -108,6 +116,20 @@ export default function Tachzuka() {
     if (error) { toast(error.message,'error'); return }
     logActivity(isNew?'INSERT':'UPDATE','tachzuka',data.id,form.teur)
     toast(isNew?'קריאה נוספה':'עודכן')
+
+    // WhatsApp לאיש הקשר / ספק אם קריאה חדשה
+    if (isNew && form.vendor_id) {
+      const vendor = vendors.find(v => v.id === form.vendor_id)
+      if (vendor?.telefon) {
+        const dira = getDiraLabel(form.dirot_id)
+        const msg = encodeURIComponent(
+          `שלום ${vendor.shem || ''},\nקריאת תחזוקה חדשה:\nדירה: ${dira}\nסוג: ${form.sug || ''}\nתיאור: ${form.teur || ''}\nאדיפות: ${form.adifut || ''}`
+        )
+        const phone = vendor.telefon.replace(/\D/g, '').replace(/^0/, '972')
+        window.open(`https://wa.me/${phone}?text=${msg}`, '_blank')
+      }
+    }
+
     if (isNew) { setForm(f=>({...f,id:data.id})); setActiveTab('pritim') }
     load(true)
   }
@@ -153,7 +175,7 @@ export default function Tachzuka() {
   const totalCost = pritim.reduce((s,p) => s + Number(p.skhum??0), 0)
 
   const columns = [
-    { key:'dirot',       label:'דירה',    render:v=>v?`${v.ktovet??''}, ${v.ir??''}`:'—' },
+    { key:'dirot_id',    label:'דירה',    render:v=>getDiraLabel(v) },
     { key:'makom_bedira',label:'מיקום' },
     { key:'sug',         label:'סוג' },
     { key:'teur',        label:'תיאור', render:v=><span className="max-w-[200px] truncate block">{v??'—'}</span> },
@@ -331,24 +353,28 @@ export default function Tachzuka() {
               <thead><tr className="text-right text-slate-500 border-b">
                 <th className="pb-2 font-medium">שם</th><th className="pb-2 font-medium">תחום</th>
                 <th className="pb-2 font-medium">טלפון</th><th className="pb-2 font-medium">עלות ממוצעת</th><th/>
-              </tr></thead>
+                           </tr></thead>
               <tbody>
                 {vendors.map(v=>(
-                  <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={()=>setVendorForm(v)}>
-                    <td className="py-2 font-medium">{v.shem}</td>
-                    <td className="py-2">{v.tchum??'—'}</td>
-                    <td className="py-2"><PhoneCell phone={v.telefon}/></td>
-                    <td className="py-2">{currency(v.avg_cost)}</td>
-                    <td className="py-2">
-                      <button onClick={async e=>{e.stopPropagation();if(!await confirm('למחוק?',{danger:true}))return;await supabase.from('vendors').delete().eq('id',v.id);load()}}
-                        className="text-red-400 hover:text-red-600"><Trash2 size={13}/></button>
+                  <tr key={v.id} className="border-b last:border-0">
+                    <td className="py-1.5">{v.shem}</td>
+                    <td>{v.tchum}</td>
+                    <td>{v.telefon}</td>
+                    <td>{v.avg_cost ? `₪${v.avg_cost}` : '—'}</td>
+                    <td>
+                      <button onClick={()=>removeVendor(v.id)} className="p-1 text-slate-400 hover:text-red-500">
+                        <Trash2 size={13}/>
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-                </div>
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button variant="secondary" onClick={()=>setVendorModal(false)}>סגור</Button>
+        </div>
       </Modal>
     </div>
   )

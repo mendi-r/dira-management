@@ -140,6 +140,19 @@ export default function Monim() {
 
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  // התעלם מאזהרות — מתאפס כל 7 ימים
+  const DISMISS_KEY = 'monim_stale_dismissed_until'
+  const [staleDismissed, setStaleDismissed] = useState(() => {
+    const v = localStorage.getItem(DISMISS_KEY)
+    return v ? new Date() < new Date(v) : false
+  })
+  function dismissStale() {
+    const exp = new Date(); exp.setDate(exp.getDate() + 7)
+    localStorage.setItem(DISMISS_KEY, exp.toISOString())
+    setStaleDismissed(true)
+  }
+
   const staleAlert = (() => {
     const lastByDira = {}
     rows.forEach(r => {
@@ -276,13 +289,17 @@ export default function Monim() {
   return (
     <div className="space-y-4 fade-in">
 
-      {staleAlert.length > 0 && (
+      {staleAlert.length > 0 && !staleDismissed && (
         <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
           <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800">
+          <div className="text-sm text-amber-800 flex-1">
             <span className="font-semibold">לא עודכנו מעל 30 יום: </span>
             {staleAlert.map(d => d.ktovet).join(' • ')}
           </div>
+          <button onClick={dismissStale}
+            className="text-xs text-amber-600 hover:text-amber-800 underline flex-shrink-0 mt-0.5">
+            התעלם לשבוע
+          </button>
         </div>
       )}
 
@@ -327,7 +344,8 @@ export default function Monim() {
       <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו קריאות" onRowClick={openEdit} />
 
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'עריכת קריאה' : 'קריאה חדשה'} size="lg">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-h-[320px]">
+        <div className="min-h-[480px] flex flex-col">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
 
           <FormField label="דירה" required>
             <Select value={form.dirot_id ?? ''} onChange={e => setField('dirot_id', e.target.value)}>
@@ -398,36 +416,25 @@ export default function Monim() {
             </div>
           )}
 
-          <FormField label="סכום לתשלום (₪)">
-            <Input type="number" step="0.01" value={form.skhum_leshalem ?? ''}
-              onChange={e => setField('skhum_leshalem', e.target.value)} placeholder="0" />
-          </FormField>
+          {!form.is_kriah_ptika && (
+            <FormField label="סכום לתשלום (₪)">
+              <Input type="number" step="0.01" value={form.skhum_leshalem ?? ''}
+                onChange={e => setField('skhum_leshalem', e.target.value)} placeholder="0" />
+            </FormField>
+          )}
 
-          <FormField label="סטטוס תשלום">
-            <div className="flex items-center gap-3 h-9">
-              <input type="checkbox" id="shulam" checked={!!form.shulam}
-                onChange={e => setField('shulam', e.target.checked)}
-                className="w-4 h-4 text-teal-600 rounded" />
-              <label htmlFor="shulam" className="text-sm text-slate-700">שולם</label>
-            </div>
-          </FormField>
+          {!form.is_kriah_ptika && (
+            <FormField label="סטטוס תשלום">
+              <div className="flex items-center gap-3 h-9">
+                <input type="checkbox" id="shulam" checked={!!form.shulam}
+                  onChange={e => setField('shulam', e.target.checked)}
+                  className="w-4 h-4 text-teal-600 rounded" />
+                <label htmlFor="shulam" className="text-sm text-slate-700">שולם</label>
+              </div>
+            </FormField>
+          )}
         </div>
-
-        <div className="mt-4">
-          <FormField label="הערה">
-            <Textarea value={form.heara ?? ''} onChange={e => setField('heara', e.target.value)} />
-          </FormField>
-        </div>
-
-        {chartData.length >= 2 && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-sm font-semibold text-slate-700 mb-2">
-              {SUG_EMOJI[form.sug_mone]} היסטוריית צריכה — {form.sug_mone}
-            </p>
-            <ConsumptionChart data={chartData} sug={form.sug_mone} />
-          </div>
-        )}
-
+        </div>{/* min-h wrapper */}
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
