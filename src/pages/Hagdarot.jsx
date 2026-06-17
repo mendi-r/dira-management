@@ -294,9 +294,3 @@ export default function Hagdarot() {
     </div>
   )
 }
->שמור</Button>
-        </div>
-      </Modal>
-    </div>
-  )
-}
