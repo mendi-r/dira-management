@@ -222,6 +222,7 @@ export default function Tachzuka() {
       <Modal open={modal} onClose={()=>setModal(false)} title={form.id?'עריכת קריאה':'קריאה חדשה'} size="xl">
         <Tabs tabs={TABS_T} active={activeTab} onChange={setActiveTab}/>
 
+        <div className="min-h-[520px]">
         {/* ── Form ── */}
         {activeTab==='form' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -321,6 +322,7 @@ export default function Tachzuka() {
         {activeTab==='docs' && (
           <FileUpload entityType="tachzuka" entityId={form.id} bucket="tachzuka-docs"/>
         )}
+        </div>
 
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={()=>setModal(false)}>סגור</Button>
