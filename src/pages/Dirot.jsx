@@ -592,7 +592,13 @@ export default function Dirot() {
       await supabase.from('tashlumim_baalim').delete().eq('dirot_id', id)
     }
 
-    // מחיקת הדירה — השיבוצים ייסגרו ע"י CASCADE. הבחורים עצמם לא נמחקים.
+    // מחיקת כל הנתונים הקשורים לדירה
+    await supabase.from('gviya').delete().eq('dirot_id', id)
+    await supabase.from('shibutzim').delete().eq('dirot_id', id)
+    await supabase.from('chozim').delete().eq('dirot_id', id)
+    await supabase.from('tachzuka').delete().eq('dirot_id', id)
+    await supabase.from('riut').delete().eq('dirot_id', id)
+    await supabase.from('documents').delete().eq('dirot_id', id)
     await supabase.from('dirot').delete().eq('id', id)
     logActivity('DELETE', 'dirot', id, addr)
     toast('נמחק')
@@ -1046,14 +1052,17 @@ export default function Dirot() {
           </FormField>
           <p className="text-xs text-slate-500">
             ✓ יווצרו שורות תשלום לבעלים לתקופה החדשה<br/>
-            ✓ ההיסטוריה של החוזה הנוכחי תישמר בתנועות
-          </p>
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <Button variant="secondary" onClick={()=>setRenewModal(false)}>ביטול</Button>
-          <Button loading={renewSaving} onClick={renewContract}>חדש חוזה</Button>
-        </div>
-      </Modal>
-    </div>
+            ✓ ההיסטוריה של החוזה הנוכחי תישמר בתנו</p>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="secondary" onClick={() => setRenewModal(false)}>ביטול</Button>
+            <Button loading={renewSaving} onClick={renewContract}>חדש חוזה</Button>
+          </div>
+        </Modal>
+
+      </div>
+    </>
+  )
+}
+v>
   )
 }

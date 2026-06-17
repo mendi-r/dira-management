@@ -153,6 +153,7 @@ export default function Bochurim() {
     if (deleteAll) {
       await supabase.from('gviya').delete().eq('bochurim_id', id)
       await supabase.from('shibutzim').delete().eq('bochurim_id', id)
+      await supabase.from('documents').delete().eq('bochurim_id', id)
       await supabase.from('bochurim').delete().eq('id', id)
       logActivity('DELETE', 'bochurim', id, name)
       toast(`${name} נמחק לחלוטין`)

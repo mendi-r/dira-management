@@ -18,6 +18,8 @@ import Reports from './pages/Reports'
 import CalendarPage from './pages/CalendarPage'
 import History from './pages/History'
 import UserManagement from './pages/UserManagement'
+import ErrorBoundary from './components/ErrorBoundary'
+import ConnectionGuard from './components/ConnectionGuard'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -35,19 +37,19 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index element={<Dashboard />} />
-        <Route path="bochurim"  element={<Bochurim />} />
-        <Route path="dirot"     element={<Dirot />} />
-        <Route path="shibutzim" element={<Shibutzim />} />
-        <Route path="gviya"      element={<Gviya />} />
-        <Route path="tashlumim"  element={<Tashlumim />} />
-        <Route path="tachzuka"  element={<Tachzuka />} />
-        <Route path="monim"     element={<Monim />} />
-        <Route path="hagdarot"  element={<Hagdarot />} />
-        <Route path="reports"   element={<Reports />} />
-        <Route path="calendar"  element={<CalendarPage />} />
-        <Route path="history"   element={<History />} />
-        <Route path="users"     element={<UserManagement />} />
+        <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+        <Route path="bochurim"  element={<ErrorBoundary><Bochurim /></ErrorBoundary>} />
+        <Route path="dirot"     element={<ErrorBoundary><Dirot /></ErrorBoundary>} />
+        <Route path="shibutzim" element={<ErrorBoundary><Shibutzim /></ErrorBoundary>} />
+        <Route path="gviya"     element={<ErrorBoundary><Gviya /></ErrorBoundary>} />
+        <Route path="tashlumim" element={<ErrorBoundary><Tashlumim /></ErrorBoundary>} />
+        <Route path="tachzuka"  element={<ErrorBoundary><Tachzuka /></ErrorBoundary>} />
+        <Route path="monim"     element={<ErrorBoundary><Monim /></ErrorBoundary>} />
+        <Route path="hagdarot"  element={<ErrorBoundary><Hagdarot /></ErrorBoundary>} />
+        <Route path="reports"   element={<ErrorBoundary><Reports /></ErrorBoundary>} />
+        <Route path="calendar"  element={<ErrorBoundary><CalendarPage /></ErrorBoundary>} />
+        <Route path="history"   element={<ErrorBoundary><History /></ErrorBoundary>} />
+        <Route path="users"     element={<ErrorBoundary><UserManagement /></ErrorBoundary>} />
       </Route>
     </Routes>
   )
@@ -59,7 +61,9 @@ export default function App() {
       <AuthProvider>
         <AlertsProvider>
           <BrowserRouter>
-            <AppRoutes />
+            <ConnectionGuard>
+              <AppRoutes />
+            </ConnectionGuard>
           </BrowserRouter>
         </AlertsProvider>
       </AuthProvider>

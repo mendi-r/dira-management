@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
@@ -61,6 +61,32 @@ export default function Hagdarot() {
     await supabase.from('hagdarot').delete().eq('id', id)
     toast('נמחק')
     load()
+  }
+
+  const [exportLoading, setExportLoading] = useState(false)
+
+  async function exportAll() {
+    setExportLoading(true)
+    const tables = [
+      'bochurim','dirot','shibutzim','gviya','tashlumim_baalim',
+      'chozim','tachzuka','tachzuka_pritim','riut','documents',
+      'activity_log','hagdarot','vendors',
+    ]
+    const result = {}
+    for (const t of tables) {
+      const { data } = await supabase.from(t).select('*')
+      result[t] = data ?? []
+    }
+    result._exported_at = new Date().toISOString()
+    result._version = '1.0'
+    const json = JSON.stringify(result, null, 2)
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `dira-backup-${new Date().toISOString().slice(0,10)}.json`
+    a.click()
+    setExportLoading(false)
+    toast(`ייצוא הושלם — ${Object.values(result).filter(Array.isArray).reduce((s,a)=>s+a.length,0)} רשומות`)
   }
 
   const [deleteModal, setDeleteModal] = useState(false)
@@ -150,6 +176,23 @@ export default function Hagdarot() {
 
       <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו הגדרות" onRowClick={openEdit} />
 
+      {/* ייצוא מלא */}
+      <div className="border border-teal-200 rounded-2xl overflow-hidden">
+        <div className="bg-teal-50 px-5 py-3 border-b border-teal-200 flex items-center gap-2">
+          <Download size={16} className="text-teal-600"/>
+          <span className="font-semibold text-teal-700 text-sm">גיבוי וייצוא</span>
+        </div>
+        <div className="p-5 flex items-center justify-between">
+          <div>
+            <p className="font-medium text-slate-800 text-sm">ייצוא מלא של כל הנתונים</p>
+            <p className="text-xs text-slate-500 mt-0.5">מוריד קובץ JSON עם כל הטבלאות — בחורים, דירות, שיבוצים, גבייה, תשלומים וכל שאר הנתונים.</p>
+          </div>
+          <Button icon={Download} loading={exportLoading} onClick={exportAll} className="flex-shrink-0 mr-4">
+            ייצוא מלא
+          </Button>
+        </div>
+      </div>
+
       {/* Danger Zone */}
       <div className="border border-red-200 rounded-2xl overflow-hidden">
         <div className="bg-red-50 px-5 py-3 border-b border-red-200 flex items-center gap-2">
@@ -211,7 +254,7 @@ export default function Hagdarot() {
                 onClick={deleteAllData}
                 disabled={deleteInput !== DELETE_PHRASE}
                 className={`px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors ${
-                  deleteInput === DELETE_PHRASE
+                         deleteInput === DELETE_PHRASE
                     ? 'bg-red-600 hover:bg-red-700'
                     : 'bg-red-200 cursor-not-allowed'
                 }`}>
@@ -220,7 +263,6 @@ export default function Hagdarot() {
             </div>
           </div>
         )}
-
         {deleteStep === 3 && (
           <div className="py-8 flex flex-col items-center gap-3">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-red-500 border-t-transparent"/>
@@ -232,26 +274,27 @@ export default function Hagdarot() {
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'עריכת הגדרה' : 'הגדרה חדשה'}>
         <div className="space-y-4">
           <FormField label="מפתח" required>
-            <Input
-              value={form.mafteach ?? ''}
-              onChange={e => setForm(f => ({ ...f, mafteach: e.target.value }))}
-              placeholder="SETTING_KEY"
-              className="font-mono"
-            />
+            <Input value={form.mafteach ?? ''} onChange={e => setForm(f => ({ ...f, mafteach: e.target.value }))} placeholder="SETTING_KEY" className="font-mono"/>
           </FormField>
           <FormField label="ערך">
-            <Input value={form.erech ?? ''} onChange={e => setForm(f => ({ ...f, erech: e.target.value }))} placeholder="ערך" />
+            <Input value={form.erech ?? ''} onChange={e => setForm(f => ({ ...f, erech: e.target.value }))} placeholder="ערך"/>
           </FormField>
           <FormField label="קטגוריה">
-            <Input value={form.sug ?? ''} onChange={e => setForm(f => ({ ...f, sug: e.target.value }))} placeholder="כללי" />
+            <Input value={form.sug ?? ''} onChange={e => setForm(f => ({ ...f, sug: e.target.value }))} placeholder="כללי"/>
           </FormField>
           <FormField label="תיאור">
-            <Textarea value={form.teur ?? ''} onChange={e => setForm(f => ({ ...f, teur: e.target.value }))} placeholder="תיאור ההגדרה..." rows={2} />
+            <Textarea value={form.teur ?? ''} onChange={e => setForm(f => ({ ...f, teur: e.target.value }))} placeholder="תיאור ההגדרה..." rows={2}/>
           </FormField>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+>שמור</Button>
         </div>
       </Modal>
     </div>
