@@ -81,12 +81,16 @@ export default function Hagdarot() {
     ]
     let anyError = null
     for (const e of entries) {
-      const { data: found } = await supabase.from('hagdarot').select('id').eq('mafteach', e.mafteach).limit(1)
-      const existing = found?.[0]
-      const { error } = existing
-        ? await supabase.from('hagdarot').update({ erech: e.erech, sug: e.sug, teur: e.teur }).eq('id', existing.id)
-        : await supabase.from('hagdarot').insert(e)
-      if (error) { anyError = error.message; break }
+      const { data: updated, error: ue } = await supabase
+        .from('hagdarot')
+        .update({ erech: e.erech, sug: e.sug, teur: e.teur })
+        .eq('mafteach', e.mafteach)
+        .select('mafteach')
+      if (ue) { anyError = ue.message; break }
+      if (!updated || updated.length === 0) {
+        const { error: ie } = await supabase.from('hagdarot').insert(e)
+        if (ie) { anyError = ie.message; break }
+      }
     }
     setPricesSaving(false)
     if (anyError) { toast('שגיאה: ' + anyError, 'error'); return }
@@ -340,14 +344,4 @@ export default function Hagdarot() {
             <Input value={form.sug ?? ''} onChange={e => setForm(f => ({ ...f, sug: e.target.value }))} placeholder="כללי"/>
           </FormField>
           <FormField label="תיאור">
-            <Textarea value={form.teur ?? ''} onChange={e => setForm(f => ({ ...f, teur: e.target.value }))} placeholder="תיאור ההגדרה..." rows={2}/>
-          </FormField>
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
-          <Button loading={saving} onClick={save}>שמור</Button>
-        </div>
-      </Modal>
-    </div>
-  )
-}
+            <Textarea value={form.teur ?? ''} onChange={e => setForm(f => ({ ...f, teur: e.target.value }))} placeho
