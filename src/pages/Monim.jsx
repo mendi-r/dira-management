@@ -99,18 +99,21 @@ export default function Monim() {
 
   useEffect(() => { load() }, [load])
 
-  // שלוף קריאה קודמת אוטומטית
-  async function fetchPrevReading(dirotId, sugMone, excludeId) {
+  // שלוף קריאה קודמת אוטומטית — autoFill=true ממלא kriah_kodem בשדה
+  async function fetchPrevReading(dirotId, sugMone, excludeId, autoFill = false) {
     if (!dirotId || !sugMone) { setPrevReading(null); return }
-    let q = supabase.from('riut')
+    const { data } = await supabase.from('riut')
       .select('*')
       .eq('dirot_id', dirotId)
       .eq('sug_mone', sugMone)
       .order('taarich_kriah', { ascending: false })
       .limit(1)
-    if (excludeId) q = q.neq('id', excludeId)
-    const { data } = await q
-    setPrevReading(data?.[0] ?? null)
+      .neq('id', excludeId || '00000000-0000-0000-0000-000000000000')
+    const prev = data?.[0] ?? null
+    setPrevReading(prev)
+    if (autoFill && prev && prev.kriah_nochchit != null) {
+      setForm(f => ({ ...f, kriah_kodem: String(prev.kriah_nochchit) }))
+    }
   }
 
   async function loadChart(dirotId, sug) {
@@ -168,15 +171,11 @@ export default function Monim() {
     setForm(f => {
       const next = { ...f, [field]: val }
       if (field === 'dirot_id' || field === 'sug_mone') {
-        fetchPrevReading(
-          field === 'dirot_id' ? val : f.dirot_id,
-          field === 'sug_mone' ? val : f.sug_mone,
-          f.id
-        )
-        loadChart(
-          field === 'dirot_id' ? val : f.dirot_id,
-          field === 'sug_mone' ? val : f.sug_mone
-        )
+        const newDirotId  = field === 'dirot_id' ? val : f.dirot_id
+        const newSugMone  = field === 'sug_mone'  ? val : f.sug_mone
+        // autoFill=true רק לרשומה חדשה ולא בעת עריכה
+        fetchPrevReading(newDirotId, newSugMone, f.id, !f.id)
+        loadChart(newDirotId, newSugMone)
       }
       if (field === 'is_kriah_ptika' && val) {
         next.kriah_kodem = ''
@@ -330,7 +329,7 @@ export default function Monim() {
 
       {/* מודל הוספה/עריכה */}
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'עריכת קריאה' : 'קריאה חדשה'} size="lg">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-h-[320px]">
 
           <FormField label="דירה" required>
             <Select value={form.dirot_id ?? ''} onChange={e => setField('dirot_id', e.target.value)}>
@@ -365,10 +364,7 @@ export default function Monim() {
               <div className="text-blue-700">
                 <span className="font-semibold">קריאה קודמת: {prevReading.kriah_nochchit}</span>
                 {prevReading.taarich_kriah && <span className="text-blue-500 mr-2">({formatDate(prevReading.taarich_kriah)})</span>}
-                <button className="mr-3 text-xs underline text-blue-600 hover:text-blue-800"
-                  onClick={() => setForm(f => ({ ...f, kriah_kodem: String(prevReading.kriah_nochchit) }))}>
-                  מלא אוטומטית
-                </button>
+                <span className="mr-3 text-xs text-blue-400">✓ הוזן אוטומטית</span>
               </div>
             </div>
           )}
