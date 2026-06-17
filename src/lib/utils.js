@@ -34,8 +34,9 @@ export function toInputDate(dateStr) {
   return d.toISOString().slice(0, 10)
 }
 
+/** תאריך היום לפי שעון ישראל (YYYY-MM-DD) */
 export function today() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' })
 }
 
 /** חישוב תאריך סיום שכירות — יום אחרון של חודש אחרון (לא תחילת הבא) */
@@ -47,12 +48,13 @@ export function calcLeaseEnd(startDate, months) {
   return d.toISOString().slice(0, 10)
 }
 
-/** כמה ימים עד תאריך יעד */
+/** כמה ימים עד תאריך יעד — לפי שעון ישראל */
 export function daysUntil(dateStr) {
   if (!dateStr) return null
-  const now  = new Date(); now.setHours(0,0,0,0)
-  const then = new Date(dateStr); then.setHours(0,0,0,0)
-  return Math.round((then - now) / 86400000)
+  const nowStr  = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' })
+  const nowDate = new Date(nowStr + 'T00:00:00')
+  const then    = new Date(dateStr + 'T00:00:00')
+  return Math.round((then - nowDate) / 86400000)
 }
 
 /** חודש בעברית */

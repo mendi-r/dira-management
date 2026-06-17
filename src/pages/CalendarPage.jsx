@@ -44,9 +44,24 @@ function getHebrewParts(date) {
   } catch { return { day:0, month:'', year:0 } }
 }
 
+/** YYYY-MM-DD מתאריך JS ללא המרת UTC */
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+/** תאריך היום לפי שעון ישראל */
+function todayIL() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' })
+}
+
 function hebrewDay(date) {
   const { day } = getHebrewParts(date)
   return hebrewNum(day)
+}
+
+function hebrewMonthYear(date) {
+  const { month, year } = getHebrewParts(date)
+  return `${month} ${hebrewNum(year % 1000)}`
 }
 
 function hebrewFullDate(date) {
@@ -151,15 +166,15 @@ export default function CalendarPage() {
   function next() { setNow(d => new Date(d.getFullYear(), d.getMonth()+1, 1)); setSel(null) }
 
   const days       = getMonthDays(year, month)
-  const todayKey   = new Date().toISOString().slice(0,10)
-  const selKey     = sel ? sel.toISOString().slice(0,10) : null
+  const todayKey   = todayIL()
+  const selKey     = sel ? dateKey(sel) : null
   const selEvents  = selKey ? (events[selKey] ?? []) : []
   const selPersEvs = selKey ? (persEvs[selKey] ?? []) : []
   const totalEvents = Object.values(events).flat().length + Object.values(persEvs).flat().length
 
   // ── פתיחת מודל אירוע ──
   function openNewEv(date) {
-    setEvForm({ ...EMPTY_EV, taarich: date ? date.toISOString().slice(0,10) : '' })
+    setEvForm({ ...EMPTY_EV, taarich: date ? dateKey(date) : todayIL() })
     setEvModal(true)
   }
   function openEditEv(ev) {
@@ -233,7 +248,7 @@ export default function CalendarPage() {
         <div className="grid grid-cols-7">
           {days.map((day, i) => {
             if (!day) return <div key={`empty-${i}`} className="h-28 border-b border-r border-slate-50"/>
-            const key    = day.toISOString().slice(0,10)
+            const key    = dateKey(day)
             const isToday = key === todayKey
             const isSel  = key === selKey
             const dayEvs = events[key] ?? []
@@ -251,6 +266,7 @@ export default function CalendarPage() {
                     {day.getDate()}
                   </span>
                   <span className="text-[9px] text-slate-400 leading-tight pr-0.5">{hebrewDay(day)}</span>
+                  <span className="text-[8px] text-slate-300 leading-tight pr-0.5">{hebrewMonthYear(day)}</span>
                 </div>
                 {/* כפתור + בhover */}
                 <button
