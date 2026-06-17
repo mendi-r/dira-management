@@ -74,19 +74,24 @@ export default function Hagdarot() {
 
   async function saveMoneimPrices() {
     setPricesSaving(true)
-    const entries = [
-      { mafteach: 'PRICE_HASHMAL', erech: String(moneimPrices.hashmal), sug: 'מונים', teur: 'מחיר לקוט"ש חשמל' },
-      { mafteach: 'PRICE_MAYIM',   erech: String(moneimPrices.mayim),   sug: 'מונים', teur: 'מחיר לקוב מים' },
-      { mafteach: 'PRICE_GAZ',     erech: String(moneimPrices.gaz),     sug: 'מונים', teur: 'מחיר למ"ק גז' },
-    ]
-    for (const e of entries) {
-      const { data: existing } = await supabase.from('hagdarot').select('id').eq('mafteach', e.mafteach).maybeSingle()
-      if (existing) await supabase.from('hagdarot').update(e).eq('id', existing.id)
-      else await supabase.from('hagdarot').insert(e)
+    const keys = ['PRICE_HASHMAL','PRICE_MAYIM','PRICE_GAZ']
+    const vals = [moneimPrices.hashmal, moneimPrices.mayim, moneimPrices.gaz]
+    const teurs = ['מחיר לקוט"ש חשמל','מחיר לקוב מים','מחיר למ"ק גז']
+    let anyError = null
+    for (let i = 0; i < 3; i++) {
+      const { data: existing, error: findErr } = await supabase
+        .from('hagdarot').select('id').eq('mafteach', keys[i]).maybeSingle()
+      if (findErr) { anyError = findErr.message; break }
+      const row = { mafteach: keys[i], erech: String(vals[i] ?? ''), sug: 'מונים', teur: teurs[i] }
+      const { error: writeErr } = existing
+        ? await supabase.from('hagdarot').update(row).eq('id', existing.id)
+        : await supabase.from('hagdarot').insert(row)
+      if (writeErr) { anyError = writeErr.message; break }
     }
     setPricesSaving(false)
-    toast('מחירי מונים עודכנו')
-    load()
+    if (anyError) { toast('שגיאה: ' + anyError, 'error'); return }
+    toast('מחירי מונים עודכנו ✓')
+    await load()
   }
 
   async function exportAll() {
