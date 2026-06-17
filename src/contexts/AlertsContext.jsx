@@ -8,9 +8,15 @@ export function AlertsProvider({ children }) {
   const [alerts, setAlerts] = useState([])
 
   async function load() {
-    const [{ data: bochurim }, { data: dirot }] = await Promise.all([
+    const { data: { user } } = await supabase.auth.getUser()
+    const today = new Date().toISOString().slice(0,10)
+
+    const [{ data: bochurim }, { data: dirot }, { data: calEvs }] = await Promise.all([
       supabase.from('bochurim').select('id,shem,mishpacha,tokef_viza').not('tokef_viza','is',null),
       supabase.from('dirot').select('id,ktovet,sofit_schirut,bituach_chadush'),
+      user
+        ? supabase.from('calendar_events').select('*').eq('user_id', user.id).eq('with_reminder', true).gte('taarich', today)
+        : Promise.resolve({ data: [] }),
     ])
 
     const list = []
@@ -50,6 +56,20 @@ export function AlertsProvider({ children }) {
           label: `ביטוח: ${d.ktovet ?? ''}`,
           days: db,
           nav: '/dirot',
+        })
+      }
+    })
+
+    // אירועים אישיים עם תזכורת
+    ;(calEvs ?? []).forEach(ev => {
+      const d = daysUntil(ev.taarich)
+      if (d !== null && d >= 0 && d <= (ev.reminder_days ?? 1)) {
+        list.push({
+          type: 'personal',
+          severity: d === 0 ? 'error' : 'warning',
+          label: ev.teur,
+          days: d,
+          nav: '/calendar',
         })
       }
     })
