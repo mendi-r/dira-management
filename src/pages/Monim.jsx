@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, Gauge, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, currency } from '../lib/utils'
@@ -68,12 +69,13 @@ function ConsumptionChart({ data, sug }) {
 
 export default function Monim() {
   const toast = useToast()
+  const [searchParams] = useSearchParams()
   const [rows, setRows]               = useState([])
   const [dirot, setDirot]             = useState([])
   const [prices, setPrices]           = useState({})
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
-  const [sugFilter, setSugFilter]     = useState('')
+  const [sugFilter, setSugFilter]     = useState(searchParams.get('sug') ?? '')
   const [dirotFilter, setDirotFilter] = useState('')
   const [shulamFilter, setShulamFilter] = useState('')
   const [modal, setModal]             = useState(false)
@@ -349,13 +351,24 @@ export default function Monim() {
         <div className="flex-1 min-w-48">
           <SearchInput value={search} onChange={setSearch} placeholder="כתובת, סוג מונה..." />
         </div>
-        <select value={sugFilter} onChange={e => setSugFilter(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
-          <option value="">כל סוגי המונים</option>
-          <option value="חשמל">חשמל</option>
-          <option value="מים">מים</option>
-          <option value="גז">גז</option>
-        </select>
+
+        {/* כפתורי סינון סוג מונה */}
+        <button
+          onClick={() => setSugFilter(f => f === 'חשמל' ? '' : 'חשמל')}
+          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter === 'חשמל' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600'}`}>
+          ⚡ חשמל
+        </button>
+        <button
+          onClick={() => setSugFilter(f => f === 'מים' ? '' : 'מים')}
+          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter === 'מים' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'}`}>
+          💧 מים
+        </button>
+        <button
+          onClick={() => setSugFilter(f => f === 'גז' ? '' : 'גז')}
+          className={`h-9 px-3 text-sm rounded-lg border font-medium transition-colors ${sugFilter === 'גז' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300 hover:text-orange-600'}`}>
+          🔥 גז
+        </button>
+
         <select value={dirotFilter} onChange={e => setDirotFilter(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
           <option value="">כל הדירות</option>
@@ -367,6 +380,16 @@ export default function Monim() {
           <option value="שולם">שולם</option>
           <option value="לא שולם">לא שולם</option>
         </select>
+
+        {/* איפוס סינונים */}
+        {(search || sugFilter || dirotFilter || shulamFilter) && (
+          <button
+            onClick={() => { setSearch(''); setSugFilter(''); setDirotFilter(''); setShulamFilter('') }}
+            className="h-9 px-3 text-sm rounded-lg border border-slate-200 bg-white text-red-500 hover:border-red-300 hover:bg-red-50">
+            ✕ נקה סינון
+          </button>
+        )}
+
         <button onClick={() => load()}
           className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center"
           title="רענן">

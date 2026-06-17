@@ -265,19 +265,19 @@ export default function Dashboard() {
         />
         <CardBody>
           <div className="grid grid-cols-3 gap-3 text-center">
-            <Clickable to="/monim" className="group">
+            <Clickable to="/monim" params={{ sug: 'חשמל' }} className="group">
               <div className="p-3 bg-yellow-50 rounded-xl group-hover:bg-yellow-100 transition-colors">
                 <p className="text-xl font-bold text-yellow-700">{currency(utilTypes.חשמל)}</p>
                 <p className="text-xs text-slate-500 mt-0.5">⚡ חשמל</p>
               </div>
             </Clickable>
-            <Clickable to="/monim" className="group">
+            <Clickable to="/monim" params={{ sug: 'מים' }} className="group">
               <div className="p-3 bg-blue-50 rounded-xl group-hover:bg-blue-100 transition-colors">
                 <p className="text-xl font-bold text-blue-700">{currency(utilTypes.מים)}</p>
                 <p className="text-xs text-slate-500 mt-0.5">💧 מים</p>
               </div>
             </Clickable>
-            <Clickable to="/monim" className="group">
+            <Clickable to="/monim" params={{ sug: 'גז' }} className="group">
               <div className="p-3 bg-orange-50 rounded-xl group-hover:bg-orange-100 transition-colors">
                 <p className="text-xl font-bold text-orange-700">{currency(utilTypes.גז)}</p>
                 <p className="text-xs text-slate-500 mt-0.5">🔥 גז</p>
