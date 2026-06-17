@@ -443,3 +443,20 @@ export default function Monim() {
     </div>
   )
 }
+er-slate-100">
+            <p className="text-sm font-semibold text-slate-700 mb-2">
+              {SUG_EMOJI[form.sug_mone]} היסטוריית צריכה — {form.sug_mone}
+            </p>
+            <ConsumptionChart data={chartData} sug={form.sug_mone} />
+          </div>
+        )}
+
+        </div>{/* min-h wrapper */}
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
+          <Button loading={saving} onClick={save}>שמור</Button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
