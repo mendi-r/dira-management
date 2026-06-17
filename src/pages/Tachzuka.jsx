@@ -379,10 +379,3 @@ export default function Tachzuka() {
     </div>
   )
 }
-    </table>
-          </div>
-                </div>
-      </Modal>
-    </div>
-  )
-}
