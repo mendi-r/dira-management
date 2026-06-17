@@ -45,6 +45,7 @@ export default function Dashboard() {
       { data: tachzukaOpen },
       { data: gviyaMonth },
       { data: tashlumimMonth },
+      { data: monimMonth },
     ] = await Promise.all([
       supabase.from('bochurim').select('*', { count:'exact', head:true }),
       supabase.from('dirot').select('*', { count:'exact', head:true }),
@@ -59,6 +60,10 @@ export default function Dashboard() {
         .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
       supabase.from('gviya').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
       supabase.from('tashlumim_baalim').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
+      supabase.from('monim').select('sug_mone,skhum_leshalem,dirot_id')
+        .gte('taarich_kriah', `${currentMonth}-01`)
+        .lte('taarich_kriah', `${currentMonth}-31`)
+        .eq('is_kriah_ptika', false),
     ])
 
     const totalBeds    = (dirot??[]).reduce((s,d) => s + Number(d.mispar_mitot??0), 0)
@@ -89,6 +94,15 @@ export default function Dashboard() {
     const tashlumimTotal = (tashlumimMonth??[]).reduce((s,t) => s + Number(t.skhum??0), 0)
     const netProfit      = gviyaTotal - tashlumimTotal
 
+    // חישוב שירותים החודש
+    const utilTypes = { חשמל: 0, מים: 0, גז: 0 }
+    ;(monimMonth ?? []).forEach(m => {
+      const v = Number(m.skhum_leshalem ?? 0)
+      if (v > 0 && utilTypes[m.sug_mone] !== undefined) utilTypes[m.sug_mone] += v
+    })
+    const utilityTotal = utilTypes.חשמל + utilTypes.מים + utilTypes.גז
+    const dirotWithReadings = new Set((monimMonth ?? []).map(m => m.dirot_id)).size
+
     const debtByBochur = {}
     ;(gviyaOpen??[]).forEach(g => {
       const key = g.bochurim ? `${g.bochurim.shem} ${g.bochurim.mishpacha}` : '—'
@@ -111,6 +125,7 @@ export default function Dashboard() {
       tachzukaOpen: tachzukaOpen??[],
       overdueCount, contractEndCount,
       currentMonth,
+      utilTypes, utilityTotal, dirotWithReadings,
     })
     setLoading(false)
   }, [])
@@ -132,7 +147,8 @@ export default function Dashboard() {
   const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds, freeApartments,
           unassigned, gviyaTotal, gviyaCollected, gviyaOutstanding,
           tashlumimTotal, netProfit, dirotStats, openDebts,
-          tachzukaOpen, overdueCount, contractEndCount, currentMonth } = data
+          tachzukaOpen, overdueCount, contractEndCount, currentMonth,
+          utilTypes, utilityTotal, dirotWithReadings } = data
 
   return (
     <div className="space-y-6 fade-in">
@@ -237,6 +253,45 @@ export default function Dashboard() {
               <p className="text-xs text-slate-400 mt-1 text-left">{Math.round(gviyaCollected / gviyaTotal * 100)}% נגבה</p>
             </div>
           )}
+        </CardBody>
+      </Card>
+
+      {/* ── כרטיס שירותים ── */}
+      <Card>
+        <CardHeader
+          title={`שירותים — ${new Date().toLocaleDateString('he-IL',{month:'long',year:'numeric'})}`}
+          subtitle="חשמל · מים · גז"
+          action={<Clickable to="/monim"><span className="text-xs text-teal-600 hover:underline cursor-pointer">כל הקריאות ←</span></Clickable>}
+        />
+        <CardBody>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <Clickable to="/monim" className="group">
+              <div className="p-3 bg-yellow-50 rounded-xl group-hover:bg-yellow-100 transition-colors">
+                <p className="text-xl font-bold text-yellow-700">{currency(utilTypes.חשמל)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">⚡ חשמל</p>
+              </div>
+            </Clickable>
+            <Clickable to="/monim" className="group">
+              <div className="p-3 bg-blue-50 rounded-xl group-hover:bg-blue-100 transition-colors">
+                <p className="text-xl font-bold text-blue-700">{currency(utilTypes.מים)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">💧 מים</p>
+              </div>
+            </Clickable>
+            <Clickable to="/monim" className="group">
+              <div className="p-3 bg-orange-50 rounded-xl group-hover:bg-orange-100 transition-colors">
+                <p className="text-xl font-bold text-orange-700">{currency(utilTypes.גז)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">🔥 גז</p>
+              </div>
+            </Clickable>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center">
+            <span className="text-sm font-semibold text-slate-600">סה״כ שירותים החודש</span>
+            <span className={`text-lg font-bold ${utilityTotal > 0 ? 'text-slate-800' : 'text-slate-400'}`}>{currency(utilityTotal)}</span>
+          </div>
+          {utilityTotal === 0
+            ? <p className="text-xs text-amber-600 mt-2 text-center">⚠️ לא נרשמו קריאות מונה החודש</p>
+            : <p className="text-xs text-slate-400 mt-1 text-center">{dirotWithReadings} דירות עם קריאות החודש</p>
+          }
         </CardBody>
       </Card>
 

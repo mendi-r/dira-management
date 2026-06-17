@@ -21,9 +21,20 @@ export default function Reports() {
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [data,  setData]  = useState(null)
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useState('monthly') // 'monthly' | 'annual' | 'forecast' | 'ranking'
+  const [view, setView] = useState('monthly') // 'monthly' | 'annual' | 'forecast' | 'ranking' | 'baalim'
+
+  // דוח בעלים
+  const [dirotList,    setDirotList]    = useState([])
+  const [baalimDira,   setBaalimDira]   = useState('')
+  const [baalimYear,   setBaalimYear]   = useState(new Date().getFullYear())
+  const [baalimData,   setBaalimData]   = useState(null)
+  const [baalimLoading,setBaalimLoading]= useState(false)
 
   useEffect(() => { load() }, [year, month])
+  useEffect(() => {
+    supabase.from('dirot').select('id,ktovet,ir').order('ktovet')
+      .then(({ data }) => setDirotList(data ?? []))
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -88,6 +99,73 @@ export default function Reports() {
     setLoading(false)
   }
 
+  async function loadBaalim() {
+    if (!baalimDira) return
+    setBaalimLoading(true)
+    setBaalimData(null)
+    const yearStart = `${baalimYear}-01-01`
+    const yearEnd   = `${baalimYear}-12-31`
+
+    const [
+      { data: monim },
+      { data: tashlumim },
+      { data: dira },
+    ] = await Promise.all([
+      supabase.from('monim').select('sug_mone,skhum_leshalem,taarich_kriah')
+        .eq('dirot_id', baalimDira).eq('is_kriah_ptika', false)
+        .gte('taarich_kriah', yearStart).lte('taarich_kriah', yearEnd),
+      supabase.from('tashlumim_baalim').select('skhum,skhum_shulam,chodesh')
+        .eq('dirot_id', baalimDira)
+        .gte('chodesh', `${baalimYear}-01`).lte('chodesh', `${baalimYear}-12`),
+      supabase.from('dirot').select('ktovet,ir,ola_schirut_chodshi').eq('id', baalimDira).single(),
+    ])
+
+    const rent = Number(dira?.ola_schirut_chodshi ?? 0)
+
+    // בניית שורה לכל חודש
+    const rows = {}
+    for (let m = 1; m <= 12; m++) {
+      const ym = `${baalimYear}-${String(m).padStart(2,'0')}`
+      rows[ym] = { chodesh: ym, skhirut: rent, hashmal: 0, mayim: 0, gaz: 0, total: 0, paid: 0, balance: 0 }
+    }
+
+    // קריאות מונה
+    ;(monim ?? []).forEach(r => {
+      const ym = r.taarich_kriah?.slice(0, 7)
+      if (!ym || !rows[ym]) return
+      const v = Number(r.skhum_leshalem ?? 0)
+      if (r.sug_mone === 'חשמל') rows[ym].hashmal += v
+      else if (r.sug_mone === 'מים') rows[ym].mayim += v
+      else if (r.sug_mone === 'גז')  rows[ym].gaz   += v
+    })
+
+    // תשלומים לבעלים
+    ;(tashlumim ?? []).forEach(t => {
+      const ym = t.chodesh
+      if (rows[ym]) rows[ym].paid += Number(t.skhum_shulam ?? 0)
+    })
+
+    // סיכומים
+    Object.values(rows).forEach(r => {
+      r.total   = r.skhirut + r.hashmal + r.mayim + r.gaz
+      r.balance = r.total - r.paid
+    })
+
+    const rowList = Object.values(rows)
+    const totals = rowList.reduce((acc, r) => ({
+      skhirut: acc.skhirut + r.skhirut,
+      hashmal: acc.hashmal + r.hashmal,
+      mayim:   acc.mayim   + r.mayim,
+      gaz:     acc.gaz     + r.gaz,
+      total:   acc.total   + r.total,
+      paid:    acc.paid    + r.paid,
+      balance: acc.balance + r.balance,
+    }), { skhirut:0, hashmal:0, mayim:0, gaz:0, total:0, paid:0, balance:0 })
+
+    setBaalimData({ dira, rows: rowList, totals })
+    setBaalimLoading(false)
+  }
+
   const years = Array.from({ length:5 },(_,i)=>new Date().getFullYear()-i)
   const months_list = Array.from({length:12},(_,i)=>({v:i+1,l:new Date(2000,i,1).toLocaleDateString('he-IL',{month:'long'})}))
 
@@ -108,11 +186,11 @@ export default function Reports() {
           </select>
         </FormField>
         <div className="flex gap-2">
-          {['monthly','annual','forecast','ranking'].map(v=>(
+          {['monthly','annual','forecast','ranking','baalim'].map(v=>(
             <button key={v} onClick={()=>setView(v)}
               className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors
                 ${view===v?'bg-teal-600 text-white':'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-              {v==='monthly'?'חודשי':v==='annual'?'שנתי':v==='forecast'?'תחזית':'דירוג'}
+              {v==='monthly'?'חודשי':v==='annual'?'שנתי':v==='forecast'?'תחזית':v==='ranking'?'דירוג':'דוח בעלים'}
             </button>
           ))}
         </div>
@@ -220,6 +298,99 @@ export default function Reports() {
             </Card>
           )}
         </>
+      )}
+
+      {/* ── דוח בעלים ── */}
+      {view==='baalim' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="דוח תשלומים לבעלים — לפי דירה"/>
+            <CardBody>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">דירה</label>
+                  <select value={baalimDira} onChange={e=>setBaalimDira(e.target.value)}
+                    className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400 min-w-48">
+                    <option value="">-- בחר דירה --</option>
+                    {dirotList.map(d=><option key={d.id} value={d.id}>{d.ktovet}{d.ir?`, ${d.ir}`:''}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">שנה</label>
+                  <select value={baalimYear} onChange={e=>setBaalimYear(Number(e.target.value))}
+                    className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
+                    {Array.from({length:5},(_,i)=>new Date().getFullYear()-i).map(y=><option key={y}>{y}</option>)}
+                  </select>
+                </div>
+                <Button onClick={loadBaalim} loading={baalimLoading} disabled={!baalimDira}>הפק דוח</Button>
+                {baalimData && (
+                  <Button variant="secondary" icon={Download} onClick={()=>exportCSV(
+                    baalimData.rows.map(r=>({
+                      חודש:r.chodesh, שכירות:r.skhirut, חשמל:r.hashmal, מים:r.mayim, גז:r.gaz,
+                      'סה"כ':r.total, שולם:r.paid, יתרה:r.balance
+                    })), `owner-report-${baalimYear}.csv`)}>
+                    ייצוא CSV
+                  </Button>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+
+          {baalimLoading && <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-4 border-teal-500 border-t-transparent"/></div>}
+
+          {baalimData && !baalimLoading && (
+            <Card>
+              <CardHeader
+                title={`${baalimData.dira?.ktovet ?? ''}${baalimData.dira?.ir ? `, ${baalimData.dira.ir}` : ''} — ${baalimYear}`}
+                subtitle={`שכירות חודשית: ${currency(baalimData.dira?.ola_schirut_chodshi ?? 0)}`}
+              />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-right text-slate-500 text-xs">
+                      <th className="px-4 py-3 font-medium">חודש</th>
+                      <th className="px-4 py-3 font-medium">שכירות</th>
+                      <th className="px-4 py-3 font-medium">⚡ חשמל</th>
+                      <th className="px-4 py-3 font-medium">💧 מים</th>
+                      <th className="px-4 py-3 font-medium">🔥 גז</th>
+                      <th className="px-4 py-3 font-medium border-r border-slate-200">סה״כ לתשלום</th>
+                      <th className="px-4 py-3 font-medium text-emerald-700">שולם</th>
+                      <th className="px-4 py-3 font-medium">יתרה</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {baalimData.rows.map(r => (
+                      <tr key={r.chodesh} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-4 py-2.5 font-medium text-slate-700">{r.chodesh}</td>
+                        <td className="px-4 py-2.5 text-slate-600">{r.skhirut > 0 ? currency(r.skhirut) : '—'}</td>
+                        <td className="px-4 py-2.5 text-yellow-700">{r.hashmal > 0 ? currency(r.hashmal) : '—'}</td>
+                        <td className="px-4 py-2.5 text-blue-700">{r.mayim > 0 ? currency(r.mayim) : '—'}</td>
+                        <td className="px-4 py-2.5 text-orange-700">{r.gaz > 0 ? currency(r.gaz) : '—'}</td>
+                        <td className="px-4 py-2.5 font-bold text-slate-800 border-r border-slate-200">{r.total > 0 ? currency(r.total) : '—'}</td>
+                        <td className="px-4 py-2.5 text-emerald-600">{r.paid > 0 ? currency(r.paid) : '—'}</td>
+                        <td className={`px-4 py-2.5 font-semibold ${r.balance > 0 ? 'text-red-600' : r.balance < 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          {r.total === 0 ? '—' : r.balance === 0 ? '✓' : currency(r.balance)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-100 font-bold text-sm">
+                      <td className="px-4 py-3 text-slate-700">סה״כ שנתי</td>
+                      <td className="px-4 py-3 text-slate-700">{currency(baalimData.totals.skhirut)}</td>
+                      <td className="px-4 py-3 text-yellow-700">{currency(baalimData.totals.hashmal)}</td>
+                      <td className="px-4 py-3 text-blue-700">{currency(baalimData.totals.mayim)}</td>
+                      <td className="px-4 py-3 text-orange-700">{currency(baalimData.totals.gaz)}</td>
+                      <td className="px-4 py-3 text-slate-800 border-r border-slate-200">{currency(baalimData.totals.total)}</td>
+                      <td className="px-4 py-3 text-emerald-600">{currency(baalimData.totals.paid)}</td>
+                      <td className={`px-4 py-3 ${baalimData.totals.balance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{currency(baalimData.totals.balance)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   )
