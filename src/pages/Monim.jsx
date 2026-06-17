@@ -22,6 +22,7 @@ const EMPTY = {
 const SUG_COLORS = { חשמל: 'amber', מים: 'blue', גז: 'red', אחר: 'gray' }
 const SUG_UNITS  = { חשמל: 'קוט״ש', מים: 'קוב', גז: 'מ״ק', אחר: '' }
 const SUG_EMOJI  = { חשמל: '⚡', מים: '💧', גז: '🔥', אחר: '📊' }
+const PRICE_KEYS = { חשמל: 'PRICE_HASHMAL', מים: 'PRICE_MAYIM', גז: 'PRICE_GAZ' }
 
 function calcCons(prev, curr, isPtika) {
   if (isPtika) return null
@@ -69,6 +70,7 @@ export default function Monim() {
   const toast = useToast()
   const [rows, setRows]               = useState([])
   const [dirot, setDirot]             = useState([])
+  const [prices, setPrices]           = useState({})
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [sugFilter, setSugFilter]     = useState('')
@@ -88,12 +90,17 @@ export default function Monim() {
     if (sugFilter)        q = q.eq('sug_mone', sugFilter)
     if (dirotFilter)      q = q.eq('dirot_id', dirotFilter)
     if (shulamFilter !== '') q = q.eq('shulam', shulamFilter === 'שולם')
-    const [{ data: r }, { data: d }] = await Promise.all([
+    const [{ data: r }, { data: d }, { data: hag }] = await Promise.all([
       q,
       supabase.from('dirot').select('id,ktovet,ir').order('ktovet'),
+      supabase.from('hagdarot').select('mafteach,erech')
+        .in('mafteach', ['PRICE_HASHMAL','PRICE_MAYIM','PRICE_GAZ']),
     ])
     setRows(r ?? [])
     setDirot(d ?? [])
+    const pm = {}
+    ;(hag ?? []).forEach(h => { pm[h.mafteach] = h.erech })
+    setPrices(pm)
     setLoading(false)
   }, [sugFilter, dirotFilter, shulamFilter])
 
@@ -126,6 +133,17 @@ export default function Monim() {
     setChartData(data ?? [])
   }
 
+  const consumption = calcCons(form.kriah_kodem, form.kriah_nochchit, form.is_kriah_ptika)
+
+  // חישוב סכום אוטומטי לפי מחיר מההגדרות
+  useEffect(() => {
+    if (!modal || form.is_kriah_ptika || consumption == null) return
+    const key = PRICE_KEYS[form.sug_mone]
+    if (!key || !prices[key]) return
+    const skhum = (consumption * Number(prices[key])).toFixed(2)
+    setForm(f => ({ ...f, skhum_leshalem: skhum }))
+  }, [consumption, form.sug_mone, form.is_kriah_ptika, modal, prices])
+
   const filtered = rows.filter(r =>
     `${r.dirot?.ktovet ?? ''} ${r.dirot?.ir ?? ''} ${r.sug_mone ?? ''}`
       .toLowerCase().includes(search.toLowerCase())
@@ -141,7 +159,6 @@ export default function Monim() {
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-  // התעלם מאזהרות — מתאפס כל 7 ימים
   const DISMISS_KEY = 'monim_stale_dismissed_until'
   const [staleDismissed, setStaleDismissed] = useState(() => {
     const v = localStorage.getItem(DISMISS_KEY)
@@ -189,14 +206,17 @@ export default function Monim() {
         fetchPrevReading(newDirotId, newSugMone, f.id, !f.id)
         loadChart(newDirotId, newSugMone)
       }
-      if (field === 'is_kriah_ptika' && val) {
-        next.kriah_kodem = ''
+      if (field === 'is_kriah_ptika') {
+        if (val) {
+          next.kriah_kodem = ''
+          next.skhum_leshalem = ''
+        } else {
+          setTimeout(() => fetchPrevReading(f.dirot_id, f.sug_mone, f.id, true), 0)
+        }
       }
       return next
     })
   }
-
-  const consumption = calcCons(form.kriah_kodem, form.kriah_nochchit, form.is_kriah_ptika)
 
   async function save() {
     if (!form.dirot_id)       { toast('יש לבחור דירה', 'error'); return }
@@ -286,6 +306,10 @@ export default function Monim() {
     },
   ]
 
+  const priceKey = PRICE_KEYS[form.sug_mone]
+  const unitPrice = priceKey && prices[priceKey] ? Number(prices[priceKey]) : 0
+  const autoAmount = unitPrice && consumption != null ? (consumption * unitPrice).toFixed(2) : null
+
   return (
     <div className="space-y-4 fade-in">
 
@@ -317,9 +341,9 @@ export default function Monim() {
         <select value={sugFilter} onChange={e => setSugFilter(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
           <option value="">כל סוגי המונים</option>
-          <option value="חשמל">⚡ חשמל</option>
-          <option value="מים">💧 מים</option>
-          <option value="גז">🔥 גז</option>
+          <option value="חשמל">חשמל</option>
+          <option value="מים">מים</option>
+          <option value="גז">גז</option>
         </select>
         <select value={dirotFilter} onChange={e => setDirotFilter(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
@@ -345,113 +369,117 @@ export default function Monim() {
 
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'עריכת קריאה' : 'קריאה חדשה'} size="lg">
         <div className="min-h-[480px] flex flex-col">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
 
-          <FormField label="דירה" required>
-            <Select value={form.dirot_id ?? ''} onChange={e => setField('dirot_id', e.target.value)}>
-              <option value="">-- בחר דירה --</option>
-              {dirot.map(d => (
-                <option key={d.id} value={d.id}>{d.ktovet}{d.ir ? ', ' + d.ir : ''}</option>
-              ))}
-            </Select>
-          </FormField>
+            <FormField label="דירה" required>
+              <Select value={form.dirot_id ?? ''} onChange={e => setField('dirot_id', e.target.value)}>
+                <option value="">-- בחר דירה --</option>
+                {dirot.map(d => (
+                  <option key={d.id} value={d.id}>{d.ktovet}{d.ir ? ', ' + d.ir : ''}</option>
+                ))}
+              </Select>
+            </FormField>
 
-          <FormField label="סוג מונה">
-            <Select value={form.sug_mone ?? 'חשמל'} onChange={e => setField('sug_mone', e.target.value)}>
-              <option value="חשמל">⚡ חשמל</option>
-              <option value="מים">💧 מים</option>
-              <option value="גז">🔥 גז</option>
-              <option value="אחר">📊 אחר</option>
-            </Select>
-          </FormField>
+            <FormField label="סוג מונה">
+              <Select value={form.sug_mone ?? 'חשמל'} onChange={e => setField('sug_mone', e.target.value)}>
+                <option value="חשמל">חשמל</option>
+                <option value="מים">מים</option>
+                <option value="גז">גז</option>
+                <option value="אחר">אחר</option>
+              </Select>
+            </FormField>
 
-          <div className="sm:col-span-2 flex items-center gap-2">
-            <input type="checkbox" id="is_kriah_ptika" checked={!!form.is_kriah_ptika}
-              onChange={e => setField('is_kriah_ptika', e.target.checked)}
-              className="w-4 h-4 text-teal-600 rounded" />
-            <label htmlFor="is_kriah_ptika" className="text-sm text-slate-700">
-              קריאת פתיחה (ראשונה לדירה/מונה זה) — צריכה = 0
-            </label>
-          </div>
+            <div className="sm:col-span-2 flex items-center gap-2">
+              <input type="checkbox" id="is_kriah_ptika" checked={!!form.is_kriah_ptika}
+                onChange={e => setField('is_kriah_ptika', e.target.checked)}
+                className="w-4 h-4 text-teal-600 rounded" />
+              <label htmlFor="is_kriah_ptika" className="text-sm text-slate-700">
+                קריאת פתיחה (ראשונה לדירה/מונה זה)
+              </label>
+            </div>
 
-          {!form.is_kriah_ptika && prevReading && (
-            <div className="sm:col-span-2 flex items-center gap-3 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm">
-              <Gauge size={15} className="text-blue-500 flex-shrink-0" />
-              <div className="text-blue-700">
-                <span className="font-semibold">קריאה קודמת: {prevReading.kriah_nochchit}</span>
-                {prevReading.taarich_kriah && (
-                  <span className="text-blue-500 mr-2">({formatDate(prevReading.taarich_kriah)})</span>
+            {!form.is_kriah_ptika && prevReading && (
+              <div className="sm:col-span-2 flex items-center gap-3 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+                <Gauge size={15} className="text-blue-500 flex-shrink-0" />
+                <div className="text-blue-700">
+                  <span className="font-semibold">קריאה קודמת: {prevReading.kriah_nochchit}</span>
+                  {prevReading.taarich_kriah && (
+                    <span className="text-blue-500 mr-2">({formatDate(prevReading.taarich_kriah)})</span>
+                  )}
+                  <span className="mr-3 text-xs text-blue-400">הוזן אוטומטית</span>
+                </div>
+              </div>
+            )}
+
+            {!form.is_kriah_ptika && (
+              <FormField label="קריאה קודמת">
+                <Input type="number" step="0.001" value={form.kriah_kodem ?? ''}
+                  onChange={e => setField('kriah_kodem', e.target.value)}
+                  placeholder={prevReading ? String(prevReading.kriah_nochchit) : '0'} />
+              </FormField>
+            )}
+
+            <FormField label="קריאה נוכחית" required>
+              <Input type="number" step="0.001" value={form.kriah_nochchit ?? ''}
+                onChange={e => setField('kriah_nochchit', e.target.value)} placeholder="0" />
+            </FormField>
+
+            <FormField label="תאריך קריאה">
+              <Input type="date" value={form.taarich_kriah ?? ''}
+                min={prevReading?.taarich_kriah ?? undefined}
+                onChange={e => setField('taarich_kriah', e.target.value)} />
+            </FormField>
+
+            {!form.is_kriah_ptika && consumption != null && (
+              <div className={`sm:col-span-2 flex items-center gap-3 px-4 py-3 rounded-xl border ${consumption >= 0 ? 'bg-teal-50 border-teal-200' : 'bg-red-50 border-red-200'}`}>
+                <span className="text-sm text-slate-600">צריכה:</span>
+                <span className={`text-xl font-bold ${consumption >= 0 ? 'text-teal-700' : 'text-red-600'}`}>
+                  {consumption}
+                </span>
+                <span className="text-sm text-slate-400">{SUG_UNITS[form.sug_mone] ?? ''}</span>
+                {autoAmount && (
+                  <span className="text-xs text-slate-500 mr-auto">
+                    × ₪{unitPrice} = ₪{autoAmount}
+                  </span>
                 )}
-                <span className="mr-3 text-xs text-blue-400">✓ הוזן אוטומטית</span>
               </div>
+            )}
+
+            {!form.is_kriah_ptika && (
+              <FormField label="סכום לתשלום (₪)">
+                <Input type="number" step="0.01" value={form.skhum_leshalem ?? ''}
+                  onChange={e => setField('skhum_leshalem', e.target.value)} placeholder="0" />
+              </FormField>
+            )}
+
+            {!form.is_kriah_ptika && (
+              <FormField label="סטטוס תשלום">
+                <div className="flex items-center gap-3 h-9">
+                  <input type="checkbox" id="shulam" checked={!!form.shulam}
+                    onChange={e => setField('shulam', e.target.checked)}
+                    className="w-4 h-4 text-teal-600 rounded" />
+                  <label htmlFor="shulam" className="text-sm text-slate-700">שולם</label>
+                </div>
+              </FormField>
+            )}
+
+            <div className="sm:col-span-2">
+              <FormField label="הערה">
+                <Textarea value={form.heara ?? ''} onChange={e => setField('heara', e.target.value)} rows={2} placeholder="הערה..." />
+              </FormField>
             </div>
-          )}
 
-          {!form.is_kriah_ptika && (
-            <FormField label="קריאה קודמת">
-              <Input type="number" step="0.001" value={form.kriah_kodem ?? ''}
-                onChange={e => setField('kriah_kodem', e.target.value)}
-                placeholder={prevReading ? String(prevReading.kriah_nochchit) : '0'} />
-            </FormField>
-          )}
-
-          <FormField label="קריאה נוכחית" required>
-            <Input type="number" step="0.001" value={form.kriah_nochchit ?? ''}
-              onChange={e => setField('kriah_nochchit', e.target.value)} placeholder="0" />
-          </FormField>
-
-          <FormField label="תאריך קריאה">
-            <Input type="date" value={form.taarich_kriah ?? ''}
-              min={prevReading?.taarich_kriah ?? undefined}
-              onChange={e => setField('taarich_kriah', e.target.value)} />
-          </FormField>
-
-          {!form.is_kriah_ptika && consumption != null && (
-            <div className={`sm:col-span-2 flex items-center gap-3 px-4 py-3 rounded-xl border ${consumption >= 0 ? 'bg-teal-50 border-teal-200' : 'bg-red-50 border-red-200'}`}>
-              <span className="text-sm text-slate-600">צריכה מחושבת:</span>
-              <span className={`text-xl font-bold ${consumption >= 0 ? 'text-teal-700' : 'text-red-600'}`}>
-                {consumption}
-              </span>
-              <span className="text-sm text-slate-400">{SUG_UNITS[form.sug_mone] ?? ''}</span>
-            </div>
-          )}
-
-          {!form.is_kriah_ptika && (
-            <FormField label="סכום לתשלום (₪)">
-              <Input type="number" step="0.01" value={form.skhum_leshalem ?? ''}
-                onChange={e => setField('skhum_leshalem', e.target.value)} placeholder="0" />
-            </FormField>
-          )}
-
-          {!form.is_kriah_ptika && (
-            <FormField label="סטטוס תשלום">
-              <div className="flex items-center gap-3 h-9">
-                <input type="checkbox" id="shulam" checked={!!form.shulam}
-                  onChange={e => setField('shulam', e.target.checked)}
-                  className="w-4 h-4 text-teal-600 rounded" />
-                <label htmlFor="shulam" className="text-sm text-slate-700">שולם</label>
-              </div>
-            </FormField>
-          )}
-        </div>
-        </div>{/* min-h wrapper */}
-        <div className="flex justify-end gap-3 mt-6">
-          <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
-          <Button loading={saving} onClick={save}>שמור</Button>
-        </div>
-      </Modal>
-    </div>
-  )
-}
-er-slate-100">
-            <p className="text-sm font-semibold text-slate-700 mb-2">
-              {SUG_EMOJI[form.sug_mone]} היסטוריית צריכה — {form.sug_mone}
-            </p>
-            <ConsumptionChart data={chartData} sug={form.sug_mone} />
           </div>
-        )}
 
-        </div>{/* min-h wrapper */}
+          {chartData.length > 0 && (
+            <div className="mt-4 p-3 bg-white border border-slate-100 rounded-xl">
+              <p className="text-sm font-semibold text-slate-700 mb-2">
+                {SUG_EMOJI[form.sug_mone]} היסטוריית צריכה
+              </p>
+              <ConsumptionChart data={chartData} sug={form.sug_mone} />
+            </div>
+          )}
+        </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
