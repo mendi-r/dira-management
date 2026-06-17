@@ -8,6 +8,18 @@ import { useNavigate } from 'react-router-dom'
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר']
 const DAYS_HE   = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳']
 
+function hebrewDay(date) {
+  try {
+    return date.toLocaleDateString('he-IL-u-ca-hebrew', { day: 'numeric' })
+  } catch { return '' }
+}
+
+function hebrewFullDate(date) {
+  try {
+    return date.toLocaleDateString('he-IL-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch { return '' }
+}
+
 function getMonthDays(year, month) {
   const first = new Date(year, month, 1)
   const last  = new Date(year, month + 1, 0)
@@ -160,10 +172,13 @@ export default function CalendarPage() {
                 onClick={() => setSel(isSel ? null : day)}
                 className={`h-24 border-b border-r border-slate-100 p-1.5 cursor-pointer transition-colors
                   ${isSel ? 'bg-teal-50 border-teal-200' : 'hover:bg-slate-50'}`}>
-                <span className={`text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full
-                  ${isToday ? 'bg-teal-600 text-white' : 'text-slate-700'}`}>
-                  {day.getDate()}
-                </span>
+                <div className="flex flex-col items-start">
+                  <span className={`text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full
+                    ${isToday ? 'bg-teal-600 text-white' : 'text-slate-700'}`}>
+                    {day.getDate()}
+                  </span>
+                  <span className="text-[9px] text-slate-400 leading-tight pr-0.5">{hebrewDay(day)}</span>
+                </div>
                 <div className="mt-0.5 space-y-0.5 overflow-hidden">
                   {dayEvs.slice(0,2).map((ev, j) => {
                     const t = EVENT_TYPES[ev.type]
@@ -186,9 +201,10 @@ export default function CalendarPage() {
       {/* Selected day panel */}
       {sel && (
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <h3 className="font-semibold text-slate-800 mb-3">
+          <h3 className="font-semibold text-slate-800">
             {sel.getDate()} {MONTHS_HE[sel.getMonth()]} {sel.getFullYear()}
           </h3>
+          <p className="text-xs text-slate-400 mb-3">{hebrewFullDate(sel)}</p>
           {selEvents.length === 0 && <p className="text-sm text-slate-400">אין אירועים ביום זה</p>}
           <div className="space-y-2">
             {selEvents.map((ev, i) => {
