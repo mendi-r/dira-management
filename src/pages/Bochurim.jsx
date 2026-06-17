@@ -29,8 +29,8 @@ function exportCSV(data, filename) {
 const EMPTY = {
   shem:'', mishpacha:'', mispar_darkon:'', mekorot:'', taarich_lida:'',
   status:'פעיל', telefon:'', email:'', ktovet:'', ir_megurim:'',
-  shem_horim:'', telefon_av:'', telefon_em:'',
-  kvutza_yeshiva:'', status_viza:'', tokef_viza:'',
+  shem_av:'', shem_horim:'', telefon_av:'', email_av:'', telefon_em:'', email_em:'', telefon_bait:'',
+  yeshivat_mekor:'', taarich_knisa_yeshiva:'', kvutza_yeshiva:'', status_viza:'', tokef_viza:'',
   ish_ksheret_shem:'', ish_ksheret_telefon:'',
   amla_chodshit:'', drive_link:'', heara:'',
 }
@@ -110,7 +110,7 @@ export default function Bochurim() {
 
   function openNew()  { setForm(EMPTY); setActiveTab('personal'); setHistory([]); setModal(true) }
   function openEdit(r){
-    setForm({ ...EMPTY, ...r, taarich_lida: toInputDate(r.taarich_lida), tokef_viza: toInputDate(r.tokef_viza) })
+    setForm({ ...EMPTY, ...r, taarich_lida: toInputDate(r.taarich_lida), tokef_viza: toInputDate(r.tokef_viza), taarich_knisa_yeshiva: toInputDate(r.taarich_knisa_yeshiva) })
     setActiveTab('personal')
     if (r.id) loadHistory(r.id)
     setModal(true)
@@ -124,8 +124,9 @@ export default function Bochurim() {
     const n = v => (v === '' || v === null || v === undefined) ? null : Number(v)
     const payload = { ...form }
     // dates — null if empty
-    if (!payload.taarich_lida) payload.taarich_lida = null
-    if (!payload.tokef_viza)   payload.tokef_viza   = null
+    if (!payload.taarich_lida)           payload.taarich_lida           = null
+    if (!payload.tokef_viza)             payload.tokef_viza             = null
+    if (!payload.taarich_knisa_yeshiva)  payload.taarich_knisa_yeshiva  = null
     // numerics
     payload.amla_chodshit = n(payload.amla_chodshit)
     delete payload.id; delete payload.created_at; delete payload.user_id
@@ -276,7 +277,7 @@ export default function Bochurim() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="שם פרטי" required><Input value={form.shem??''} onChange={set('shem')} placeholder="ישראל"/></FormField>
             <FormField label="שם משפחה"><Input value={form.mishpacha??''} onChange={set('mishpacha')} placeholder="ישראלי"/></FormField>
-            <FormField label="מספר דרכון"><Input value={form.mispar_darkon??''} onChange={set('mispar_darkon')} placeholder="AB123456"/></FormField>
+            <FormField label="תעודת זהות / דרכון"><Input value={form.mispar_darkon??''} onChange={set('mispar_darkon')} placeholder="AB123456 / 123456789"/></FormField>
             <FormField label="מוצא / ארץ מוצא"><Input value={form.mekorot??''} onChange={set('mekorot')} placeholder="ארה״ב"/></FormField>
             <FormField label="תאריך לידה">
               <DualDateField value={form.taarich_lida??''} onChange={v=>setForm(f=>({...f,taarich_lida:v}))}/>
@@ -317,18 +318,39 @@ export default function Bochurim() {
             <hr className="border-slate-100"/>
             <p className="text-sm font-semibold text-slate-600">הורים</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="שם הורים"><Input value={form.shem_horim??''} onChange={set('shem_horim')} placeholder="אברהם ושרה ישראלי"/></FormField>
-              <div/>
+              <FormField label="שם האב"><Input value={form.shem_av??''} onChange={set('shem_av')} placeholder="אברהם ישראלי"/></FormField>
+              <FormField label="שם הורים (כללי)"><Input value={form.shem_horim??''} onChange={set('shem_horim')} placeholder="אברהם ושרה ישראלי"/></FormField>
+
               <FormField label="טלפון אב">
                 <div className="flex items-center gap-2">
                   <Input value={form.telefon_av??''} onChange={set('telefon_av')} placeholder="050-1111111"/>
                   <ContactButtons phone={form.telefon_av}/>
                 </div>
               </FormField>
+              <FormField label="אימייל אב">
+                <div className="flex items-center gap-2">
+                  <Input type="email" value={form.email_av??''} onChange={set('email_av')} placeholder="father@example.com"/>
+                  {form.email_av && <ContactButtons email={form.email_av}/>}
+                </div>
+              </FormField>
+
               <FormField label="טלפון אם">
                 <div className="flex items-center gap-2">
                   <Input value={form.telefon_em??''} onChange={set('telefon_em')} placeholder="050-2222222"/>
                   <ContactButtons phone={form.telefon_em}/>
+                </div>
+              </FormField>
+              <FormField label="אימייל אם">
+                <div className="flex items-center gap-2">
+                  <Input type="email" value={form.email_em??''} onChange={set('email_em')} placeholder="mother@example.com"/>
+                  {form.email_em && <ContactButtons email={form.email_em}/>}
+                </div>
+              </FormField>
+
+              <FormField label="טלפון בית בחו״ל">
+                <div className="flex items-center gap-2">
+                  <Input value={form.telefon_bait??''} onChange={set('telefon_bait')} placeholder="+1-212-0000000"/>
+                  <ContactButtons phone={form.telefon_bait}/>
                 </div>
               </FormField>
             </div>
@@ -339,7 +361,11 @@ export default function Bochurim() {
         {activeTab==='visa' && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="קבוצה / ישיבה / מוסד"><Input value={form.kvutza_yeshiva??''} onChange={set('kvutza_yeshiva')} placeholder="ישיבת..."/></FormField>
+              <FormField label="ישיבת מקור"><Input value={form.yeshivat_mekor??''} onChange={set('yeshivat_mekor')} placeholder="ישיבת המקור בחו״ל"/></FormField>
+              <FormField label="תאריך כניסה לישיבה">
+                <DualDateField value={form.taarich_knisa_yeshiva??''} onChange={v=>setForm(f=>({...f,taarich_knisa_yeshiva:v}))}/>
+              </FormField>
+              <FormField label="קבוצה / ישיבה / מוסד נוכחי"><Input value={form.kvutza_yeshiva??''} onChange={set('kvutza_yeshiva')} placeholder="ישיבת..."/></FormField>
               <div/>
               <FormField label="סטטוס ויזה">
                 <Select value={form.status_viza??''} onChange={set('status_viza')}>
