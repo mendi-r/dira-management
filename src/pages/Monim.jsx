@@ -113,6 +113,7 @@ export default function Monim() {
       .eq('dirot_id', dirotId)
       .eq('sug_mone', sugMone)
       .order('taarich_kriah', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
       .neq('id', excludeId || '00000000-0000-0000-0000-000000000000')
     const prev = data?.[0] ?? null

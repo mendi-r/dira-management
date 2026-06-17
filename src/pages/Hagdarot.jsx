@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle, Download } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle, Download, Gauge } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
@@ -29,6 +29,11 @@ export default function Hagdarot() {
     if (sugFilter) q = q.eq('sug', sugFilter)
     const { data } = await q
     setRows(data ?? [])
+    const { data: pd } = await supabase.from('hagdarot').select('mafteach,erech')
+      .in('mafteach', ['PRICE_HASHMAL','PRICE_MAYIM','PRICE_GAZ'])
+    const pm = {}
+    ;(pd ?? []).forEach(h => { pm[h.mafteach] = h.erech })
+    setMoneimPrices({ hashmal: pm['PRICE_HASHMAL'] ?? '', mayim: pm['PRICE_MAYIM'] ?? '', gaz: pm['PRICE_GAZ'] ?? '' })
     setLoading(false)
   }, [sugFilter])
 
@@ -63,7 +68,26 @@ export default function Hagdarot() {
     load()
   }
 
+  const [moneimPrices, setMoneimPrices]   = useState({ hashmal: '', mayim: '', gaz: '' })
+  const [pricesSaving, setPricesSaving]   = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+
+  async function saveMoneimPrices() {
+    setPricesSaving(true)
+    const entries = [
+      { mafteach: 'PRICE_HASHMAL', erech: String(moneimPrices.hashmal), sug: 'מונים', teur: 'מחיר לקוט"ש חשמל' },
+      { mafteach: 'PRICE_MAYIM',   erech: String(moneimPrices.mayim),   sug: 'מונים', teur: 'מחיר לקוב מים' },
+      { mafteach: 'PRICE_GAZ',     erech: String(moneimPrices.gaz),     sug: 'מונים', teur: 'מחיר למ"ק גז' },
+    ]
+    for (const e of entries) {
+      const { data: existing } = await supabase.from('hagdarot').select('id').eq('mafteach', e.mafteach).maybeSingle()
+      if (existing) await supabase.from('hagdarot').update(e).eq('id', existing.id)
+      else await supabase.from('hagdarot').insert(e)
+    }
+    setPricesSaving(false)
+    toast('מחירי מונים עודכנו')
+    load()
+  }
 
   async function exportAll() {
     setExportLoading(true)
@@ -175,6 +199,34 @@ export default function Hagdarot() {
       <p className="text-sm text-slate-400">{filtered.length} הגדרות</p>
 
       <Table columns={columns} data={filtered} loading={loading} emptyText="לא נמצאו הגדרות" onRowClick={openEdit} />
+
+      {/* מחירי מונים */}
+      <div className="border border-teal-200 rounded-2xl overflow-hidden">
+        <div className="bg-teal-50 px-5 py-3 border-b border-teal-200 flex items-center gap-2">
+          <Gauge size={16} className="text-teal-600"/>
+          <span className="font-semibold text-teal-700 text-sm">מחירי מונים</span>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-slate-500">מחירים אלו ישמשו לחישוב אוטומטי של סכום לתשלום בקריאות מונים.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <FormField label="חשמל (₪ לקוט״ש)">
+              <Input type="number" step="0.01" value={moneimPrices.hashmal}
+                onChange={e => setMoneimPrices(p => ({...p, hashmal: e.target.value}))} placeholder="0.00"/>
+            </FormField>
+            <FormField label="מים (₪ לקוב)">
+              <Input type="number" step="0.01" value={moneimPrices.mayim}
+                onChange={e => setMoneimPrices(p => ({...p, mayim: e.target.value}))} placeholder="0.00"/>
+            </FormField>
+            <FormField label="גז (₪ למ״ק)">
+              <Input type="number" step="0.01" value={moneimPrices.gaz}
+                onChange={e => setMoneimPrices(p => ({...p, gaz: e.target.value}))} placeholder="0.00"/>
+            </FormField>
+          </div>
+          <div className="flex justify-end">
+            <Button loading={pricesSaving} onClick={saveMoneimPrices}>שמור מחירים</Button>
+          </div>
+        </div>
+      </div>
 
       {/* ייצוא מלא */}
       <div className="border border-teal-200 rounded-2xl overflow-hidden">
