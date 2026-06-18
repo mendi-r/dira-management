@@ -260,13 +260,15 @@ export default function CalendarPage() {
                 onClick={() => setSel(isSel ? null : day)}
                 className={`h-28 border-b border-r border-slate-100 p-1.5 cursor-pointer transition-colors relative group
                   ${isSel ? 'bg-teal-50 border-teal-200' : 'hover:bg-slate-50'}`}>
-                <div className="flex flex-col items-start">
-                  <span className={`text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full
-                    ${isToday ? 'bg-teal-600 text-white' : 'text-slate-700'}`}>
+                <div className="flex items-center gap-1.5 w-full">
+                  <span className={`text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0
+                    ${isToday ? 'bg-teal-600 text-white' : 'text-slate-800'}`}>
                     {day.getDate()}
                   </span>
-                  <span className="text-[9px] text-slate-400 leading-tight pr-0.5">{hebrewDay(day)}</span>
-                  <span className="text-[8px] text-slate-300 leading-tight pr-0.5">{hebrewMonthYear(day)}</span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-slate-600 leading-none">{hebrewDay(day)}</p>
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5 truncate">{hebrewMonthYear(day)}</p>
+                  </div>
                 </div>
                 {/* כפתור + בhover */}
                 <button
