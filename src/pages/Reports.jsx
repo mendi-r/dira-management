@@ -18,6 +18,22 @@ function exportCSV(data, filename) {
 
 const STATUS_COLORS = { שולם:'green', 'לא שולם':'red', חלקי:'yellow' }
 
+/** חישוב סטטוס תשלום לפי סכומים בפועל (לא לפי DB) */
+function calcStatus(total, paid) {
+  if (total <= 0) return null
+  if (paid >= total) return 'שולם'
+  if (paid > 0)     return 'חלקי'
+  return 'לא שולם'
+}
+
+/** sessionStorage utils */
+function ssGet(key, fallback = null) {
+  try { const v = sessionStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback }
+}
+function ssSet(key, val) {
+  try { sessionStorage.setItem(key, JSON.stringify(val)) } catch {}
+}
+
 export default function Reports() {
   const [year,  setYear]  = useState(new Date().getFullYear())
   const [month, setMonth] = useState(new Date().getMonth() + 1)
@@ -25,11 +41,11 @@ export default function Reports() {
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState(() => sessionStorage.getItem('reports_view') ?? 'monthly')
 
-  // דוח בעלים
+  // דוח בעלים — שמירת מצב ב-sessionStorage
   const [dirotList,    setDirotList]    = useState([])
-  const [baalimDira,   setBaalimDira]   = useState('')
-  const [baalimYear,   setBaalimYear]   = useState(new Date().getFullYear())
-  const [baalimData,   setBaalimData]   = useState(null)
+  const [baalimDira,   setBaalimDira]   = useState(() => ssGet('baalim_dira', ''))
+  const [baalimYear,   setBaalimYear]   = useState(() => ssGet('baalim_year', new Date().getFullYear()))
+  const [baalimData,   setBaalimData]   = useState(() => ssGet('baalim_data', null))
   const [baalimLoading,setBaalimLoading]= useState(false)
 
   useEffect(() => { load() }, [year, month])
@@ -196,7 +212,9 @@ export default function Reports() {
       balance: acc.balance + r.balance,
     }), { skhirut:0, hashmal:0, mayim:0, gaz:0, total:0, paid:0, balance:0 })
 
-    setBaalimData({ dira, rows, totals })
+    const result = { dira, rows, totals }
+    setBaalimData(result)
+    ssSet('baalim_data', result)
     setBaalimLoading(false)
   }
 
@@ -350,7 +368,7 @@ export default function Reports() {
               <div className="flex flex-wrap items-end gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">דירה</label>
-                  <select value={baalimDira} onChange={e=>setBaalimDira(e.target.value)}
+                  <select value={baalimDira} onChange={e=>{ setBaalimDira(e.target.value); ssSet('baalim_dira', e.target.value) }}
                     className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400 min-w-48">
                     <option value="">-- בחר דירה --</option>
                     {dirotList.map(d=><option key={d.id} value={d.id}>{d.ktovet}{d.ir?`, ${d.ir}`:''}</option>)}
@@ -358,7 +376,7 @@ export default function Reports() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">שנה</label>
-                  <select value={baalimYear} onChange={e=>setBaalimYear(Number(e.target.value))}
+                  <select value={baalimYear} onChange={e=>{ setBaalimYear(Number(e.target.value)); ssSet('baalim_year', Number(e.target.value)) }}
                     className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
                     {years.map(y=><option key={y}>{y}</option>)}
                   </select>
@@ -408,9 +426,12 @@ export default function Reports() {
                         אין תשלומים לבעלים עבור דירה זו בשנה {baalimYear}
                       </td></tr>
                     )}
-                    {baalimData.rows.map(r => (
+                    {baalimData.rows.map(r => {
+                      // סטטוס מחושב לפי total+paid בפועל (כולל שירותים) — לא לפי DB
+                      const computedStatus = calcStatus(r.total, r.paid)
+                      return (
                       <tr key={r.id} className={`border-b border-slate-100 hover:bg-slate-50
-                        ${r.status==='לא שולם'?'bg-red-50/30':r.status==='חלקי'?'bg-amber-50/30':''}`}>
+                        ${computedStatus==='לא שולם'?'bg-red-50/30':computedStatus==='חלקי'?'bg-amber-50/30':''}`}>
                         <td className="px-4 py-2.5 font-medium text-slate-700">{r.chodesh || '—'}</td>
                         <td className="px-4 py-2.5 text-slate-500">{formatDate(r.taarich)}</td>
                         <td className="px-4 py-2.5 text-slate-600">{r.skhirut > 0 ? currency(r.skhirut) : '—'}</td>
@@ -423,10 +444,11 @@ export default function Reports() {
                           {r.total === 0 ? '—' : r.balance === 0 ? '✓' : currency(r.balance)}
                         </td>
                         <td className="px-4 py-2.5">
-                          {r.status ? <Badge color={STATUS_COLORS[r.status]??'gray'}>{r.status}</Badge> : '—'}
+                          {computedStatus ? <Badge color={STATUS_COLORS[computedStatus]??'gray'}>{computedStatus}</Badge> : '—'}
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-100 font-bold text-sm">

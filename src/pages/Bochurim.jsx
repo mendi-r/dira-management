@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { UserPlus, Edit2, Trash2, Clock, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, toInputDate, today, daysUntil, currency, logActivity } from '../lib/utils'
+import { cached, clearCache } from '../lib/cache'
 import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
 import SearchInput from '../components/ui/SearchInput'
@@ -67,19 +68,27 @@ export default function Bochurim() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    let q = supabase.from('bochurim').select('*').order('shem')
-    if (statusFilter) q = q.eq('status', statusFilter)
-    else q = q.neq('status', 'הוסר')
-    const [{ data }, { data: activeShib }] = await Promise.all([
-      q,
-      supabase.from('shibutzim').select('bochurim_id').eq('status', 'פעיל'),
+    const cacheKey = `bochurim_${statusFilter}`
+    // אם silent=false (רענון ידני) — נקה מטמון
+    if (!silent) clearCache(cacheKey)
+
+    const [data, activeShib] = await Promise.all([
+      cached(cacheKey, async () => {
+        let q = supabase.from('bochurim').select('*').order('shem')
+        if (statusFilter) q = q.eq('status', statusFilter)
+        else q = q.neq('status', 'הוסר')
+        const { data } = await q
+        return data ?? []
+      }, 90_000),
+      cached('shibutzim_active_ids', async () => {
+        const { data } = await supabase.from('shibutzim').select('bochurim_id').eq('status', 'פעיל')
+        return (data ?? []).map(s => s.bochurim_id)
+      }, 60_000),
     ])
-    const rows = data ?? []
-    setRows(rows)
-    setAssignedIds(new Set((activeShib??[]).map(s => s.bochurim_id)))
-    // התראות ויזה
-    const now = new Date()
-    const warn = rows.filter(r => {
+
+    setRows(data)
+    setAssignedIds(new Set(activeShib))
+    const warn = data.filter(r => {
       if (!r.tokef_viza) return false
       const d = daysUntil(r.tokef_viza)
       return d !== null && d <= 60 && d >= 0
@@ -140,6 +149,7 @@ export default function Bochurim() {
     logActivity(isNew ? 'INSERT' : 'UPDATE', 'bochurim', data.id, `${form.shem} ${form.mishpacha}`)
     toast(isNew ? 'בחור נוסף בהצלחה' : 'עודכן בהצלחה')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
+    clearCache(`bochurim_${statusFilter}`); clearCache('bochurim_')
     load(true)
   }
 
