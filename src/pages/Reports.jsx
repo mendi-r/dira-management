@@ -147,9 +147,9 @@ export default function Reports() {
       { data: tashlumim },
       { data: dira },
     ] = await Promise.all([
-      // קריאות מונה לדירה השנה
+      // קריאות מונה לדירה השנה — כולל shulam לחישוב תשלום שירותים
       supabase.from('riut')
-        .select('sug_mone,skhum_leshalem,taarich_kriah')
+        .select('sug_mone,skhum_leshalem,taarich_kriah,shulam')
         .eq('dirot_id', baalimDira)
         .eq('is_kriah_ptika', false)
         .gte('taarich_kriah', `${baalimYear}-01-01`)
@@ -167,13 +167,14 @@ export default function Reports() {
         .single(),
     ])
 
-    // קריאות מונה לפי חודש
+    // קריאות מונה לפי חודש — כולל כמה שולם בפועל (riut.shulam)
     const utilByMonth = {}
     ;(monim ?? []).forEach(r => {
       const ym = r.taarich_kriah?.slice(0, 7)
       if (!ym) return
-      if (!utilByMonth[ym]) utilByMonth[ym] = { hashmal:0, mayim:0, gaz:0 }
+      if (!utilByMonth[ym]) utilByMonth[ym] = { hashmal:0, mayim:0, gaz:0, utils_paid:0 }
       const v = Number(r.skhum_leshalem ?? 0)
+      if (r.shulam) utilByMonth[ym].utils_paid += v  // שולם → מוסיפים לתשלום
       if      (r.sug_mone === 'חשמל') utilByMonth[ym].hashmal += v
       else if (r.sug_mone === 'מים')  utilByMonth[ym].mayim   += v
       else if (r.sug_mone === 'גז')   utilByMonth[ym].gaz     += v
@@ -182,9 +183,10 @@ export default function Reports() {
     // שורה לכל תשלום — מדויק 1:1 עם מסך תשלומים לבעלים
     const rows = (tashlumim ?? []).map(t => {
       const ym   = t.chodesh ?? ''
-      const util = utilByMonth[ym] ?? { hashmal:0, mayim:0, gaz:0 }
+      const util = utilByMonth[ym] ?? { hashmal:0, mayim:0, gaz:0, utils_paid:0 }
       const skhirut     = Number(t.skhum ?? 0)
-      const paid        = Number(t.skhum_shulam ?? 0)
+      // paid = שכירות ששולמה + שירותים ששולמו (riut.shulam=true)
+      const paid        = Number(t.skhum_shulam ?? 0) + (util.utils_paid ?? 0)
       const utils_total = util.hashmal + util.mayim + util.gaz
       const total       = skhirut + utils_total
       return {

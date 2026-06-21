@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext'
 const AlertsCtx = createContext({ alerts: [], total: 0, reload: () => {} })
 
 export function AlertsProvider({ children }) {
-  const { user } = useAuth()   // ← מהמטמון, ללא נסיעת רשת
+  const { user, loading: authLoading } = useAuth()   // ← מהמטמון, ללא נסיעת רשת
   const [alerts, setAlerts] = useState([])
 
   async function load() {
@@ -86,11 +86,11 @@ export function AlertsProvider({ children }) {
   }
 
   useEffect(() => {
-    if (user === undefined) return  // auth עדיין נטען
+    if (authLoading) return  // מחכים שה-auth יסיים לפני הטעינה הראשונה
     load()
     const interval = setInterval(load, 5 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [user?.id])  // רץ מחדש כשמשתמש מתחבר/מנתק
+  }, [authLoading, user?.id])  // רץ פעם אחת אחרי auth, ושוב אם משתמש מתחלף
 
   return (
     <AlertsCtx.Provider value={{ alerts, total: alerts.length, reload: load }}>

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react'
+import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AlertsProvider } from './contexts/AlertsContext'
@@ -7,38 +7,24 @@ import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import ConnectionGuard from './components/ConnectionGuard'
 
-// ── Lazy-load כל עמוד — כל עמוד נטען רק כשנכנסים אליו ──
-const Login        = lazy(() => import('./pages/Login'))
-const Dashboard    = lazy(() => import('./pages/Dashboard'))
-const Bochurim     = lazy(() => import('./pages/Bochurim'))
-const Dirot        = lazy(() => import('./pages/Dirot'))
-const Shibutzim    = lazy(() => import('./pages/Shibutzim'))
-const Gviya        = lazy(() => import('./pages/Gviya'))
-const Tashlumim    = lazy(() => import('./pages/Tashlumim'))
-const Tachzuka     = lazy(() => import('./pages/Tachzuka'))
-const Monim        = lazy(() => import('./pages/Monim'))
-const Hagdarot     = lazy(() => import('./pages/Hagdarot'))
-const Reports      = lazy(() => import('./pages/Reports'))
-const CalendarPage = lazy(() => import('./pages/CalendarPage'))
-const History      = lazy(() => import('./pages/History'))
-const UserManagement = lazy(() => import('./pages/UserManagement'))
-
-function PageLoader() {
-  return (
-    <div className="flex items-center justify-center py-24">
-      <div className="animate-spin rounded-full h-8 w-8 border-4 border-teal-500 border-t-transparent"/>
-    </div>
-  )
-}
+// ── ייבוא ישיר — ניווט מיידי, ללא המתנה לטעינת chunk ──
+import Login          from './pages/Login'
+import Dashboard      from './pages/Dashboard'
+import Bochurim       from './pages/Bochurim'
+import Dirot          from './pages/Dirot'
+import Shibutzim      from './pages/Shibutzim'
+import Gviya          from './pages/Gviya'
+import Tashlumim      from './pages/Tashlumim'
+import Tachzuka       from './pages/Tachzuka'
+import Monim          from './pages/Monim'
+import Hagdarot       from './pages/Hagdarot'
+import Reports        from './pages/Reports'
+import CalendarPage   from './pages/CalendarPage'
+import History        from './pages/History'
+import UserManagement from './pages/UserManagement'
 
 function Wrap({ children }) {
-  return (
-    <ErrorBoundary>
-      <Suspense fallback={<PageLoader />}>
-        {children}
-      </Suspense>
-    </ErrorBoundary>
-  )
+  return <ErrorBoundary>{children}</ErrorBoundary>
 }
 
 function PrivateRoute({ children }) {
@@ -57,7 +43,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Wrap><Login /></Wrap>} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index          element={<Wrap><Dashboard /></Wrap>} />
+        <Route index            element={<Wrap><Dashboard /></Wrap>} />
         <Route path="bochurim"  element={<Wrap><Bochurim /></Wrap>} />
         <Route path="dirot"     element={<Wrap><Dirot /></Wrap>} />
         <Route path="shibutzim" element={<Wrap><Shibutzim /></Wrap>} />
