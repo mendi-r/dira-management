@@ -299,15 +299,22 @@ export default function Monim() {
     { key: 'taarich_kriah',  label: 'תאריך',       render: v => formatDate(v) },
     { key: 'skhum_leshalem', label: 'סכום',        render: v => v ? currency(v) : '—' },
     {
-      key: 'shulam', label: 'תשלום', render: (v, row) => (
-        <button
-          onClick={e => { e.stopPropagation(); toggleShulam(row) }}
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${v ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
-        >
-          {v ? <CheckCircle size={11} /> : <XCircle size={11} />}
-          {v ? 'שולם' : 'לא שולם'}
-        </button>
-      )
+      key: 'shulam', label: 'תשלום', render: (v, row) => {
+        if (row.is_kriah_ptika) return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200">
+            קריאת פתיחה
+          </span>
+        )
+        return (
+          <button
+            onClick={e => { e.stopPropagation(); toggleShulam(row) }}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${v ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+          >
+            {v ? <CheckCircle size={11} /> : <XCircle size={11} />}
+            {v ? 'שולם' : 'לא שולם'}
+          </button>
+        )
+      }
     },
     {
       key: 'actions', label: '', width: 80, render: (_, row) => (

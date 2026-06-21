@@ -1,15 +1,17 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { daysUntil } from '../lib/utils'
+import { useAuth } from './AuthContext'
 
 const AlertsCtx = createContext({ alerts: [], total: 0, reload: () => {} })
 
 export function AlertsProvider({ children }) {
+  const { user } = useAuth()   // ← מהמטמון, ללא נסיעת רשת
   const [alerts, setAlerts] = useState([])
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
-    const today = new Date().toISOString().slice(0,10)
+    // שעון ישראל — ללא network call
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' })
 
     const [{ data: bochurim }, { data: dirot }, { data: calEvs }] = await Promise.all([
       supabase.from('bochurim').select('id,shem,mishpacha,tokef_viza').not('tokef_viza','is',null),
@@ -84,10 +86,11 @@ export function AlertsProvider({ children }) {
   }
 
   useEffect(() => {
+    if (user === undefined) return  // auth עדיין נטען
     load()
-    const interval = setInterval(load, 5 * 60 * 1000) // refresh every 5 min
+    const interval = setInterval(load, 5 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [user?.id])  // רץ מחדש כשמשתמש מתחבר/מנתק
 
   return (
     <AlertsCtx.Provider value={{ alerts, total: alerts.length, reload: load }}>

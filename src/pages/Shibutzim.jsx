@@ -336,15 +336,47 @@ export default function Shibutzim() {
 
     setSaving(true)
     const isNew = !form.id
-
-    // ── בדיקת מיטות פנויות לפי חודש (גם בשיבוץ חדש וגם בעריכה) ──
     const dira = dirot.find(d => d.id === form.dirot_id)
+
+    // ── חישוב תנאי קיצור מראש (sync) ──
+    const isEditShortening = !isNew
+      && form.taarich_siyum && originalSiyum
+      && form.taarich_siyum !== originalSiyum
+      && new Date(form.taarich_siyum + 'T12:00:00') < new Date(originalSiyum + 'T12:00:00')
+
+    // ── הרץ את כל שאילתות הוולידציה במקביל (במקום 3 × ~200ms סדרתי) ──
+    const [existingShibsRes, existingShibRes, extraGviyaRes] = await Promise.all([
+      // (1) בדיקת קיבולת — רק אם לדירה יש מגבלת מיטות
+      dira?.mispar_mitot
+        ? supabase.from('shibutzim')
+            .select('taarich_tchila, taarich_siyum')
+            .eq('dirot_id', form.dirot_id)
+            .in('status', ['פעיל', 'הסתיים'])
+            .neq('id', form.id ?? '00000000-0000-0000-0000-000000000000')
+        : Promise.resolve({ data: [] }),
+      // (2) בדיקת שיבוץ כפול — רק לשיבוץ חדש
+      isNew
+        ? supabase.from('shibutzim')
+            .select('id, dirot!dirot_id(ktovet, ir)')
+            .eq('bochurim_id', form.bochurim_id)
+            .eq('status', 'פעיל')
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      // (3) בדיקת גבייה בקיצור תקופה — רק לעריכה שמקצרת
+      isEditShortening
+        ? supabase.from('gviya')
+            .select('id, status, chodesh')
+            .eq('bochurim_id', form.bochurim_id)
+            .eq('dirot_id', form.dirot_id)
+            .gt('chodesh', form.taarich_siyum.slice(0, 7))
+        : Promise.resolve({ data: [] }),
+    ])
+
+    // ── הערכת תוצאות (סדרתית, ללא DB נוסף) ──
+
+    // בדיקת קיבולת
     if (dira?.mispar_mitot) {
-      const { data: existingShibs } = await supabase.from('shibutzim')
-        .select('taarich_tchila, taarich_siyum')
-        .eq('dirot_id', form.dirot_id)
-        .in('status', ['פעיל', 'הסתיים'])
-        .neq('id', form.id ?? '00000000-0000-0000-0000-000000000000')
+      const existingShibs = existingShibsRes.data ?? []
       const totalMitot = Number(dira.mispar_mitot)
       if (form.taarich_tchila) {
         const rangeMonths = getMonthsInRange(form.taarich_tchila, form.taarich_siyum || form.taarich_tchila)
@@ -352,7 +384,7 @@ export default function Shibutzim() {
           const [y, m] = ym.split('-').map(Number)
           const monthStart = `${ym}-01`
           const monthEnd   = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`
-          const count = (existingShibs ?? []).filter(s => {
+          const count = existingShibs.filter(s => {
             const sS = s.taarich_tchila ?? '1900-01-01'
             const sE = s.taarich_siyum  ?? '2999-12-31'
             return sS <= monthEnd && sE >= monthStart
@@ -364,8 +396,8 @@ export default function Shibutzim() {
           setSaving(false); return
         }
       } else if (isNew) {
-        // אין תאריך ושיבוץ חדש — בדיקת תפוסה נוכחית
-        const occupied = (existingShibs ?? []).filter(s => !s.taarich_siyum || s.taarich_siyum >= new Date().toISOString().slice(0,10)).length
+        const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' })
+        const occupied = existingShibs.filter(s => !s.taarich_siyum || s.taarich_siyum >= today).length
         if (occupied >= totalMitot) {
           toast(`אין מיטות פנויות — הדירה מלאה (${occupied}/${totalMitot})`, 'error')
           setSaving(false); return
@@ -373,49 +405,31 @@ export default function Shibutzim() {
       }
     }
 
-    if (isNew) {
-
-      // ── בדיקת שיבוץ כפול ──
-      const { data: existingShib } = await supabase.from('shibutzim')
-        .select('id, dirot!dirot_id(ktovet, ir)')
-        .eq('bochurim_id', form.bochurim_id)
-        .eq('status', 'פעיל')
-        .maybeSingle()
-      if (existingShib) {
-        const d = existingShib.dirot
-        const addr = d ? `${d.ktovet ?? ''}${d.ir ? ', ' + d.ir : ''}` : '—'
-        const go = await confirm(
-          `בחור זה כבר משובץ בדירה "${addr}".\nלסיים את השיבוץ הנוכחי ולהעביר אותו לדירה החדשה?`,
-          { confirmText: 'העבר', cancelText: 'ביטול' }
-        )
-        if (!go) { setSaving(false); return }
-        const endDate = form.taarich_tchila || new Date().toISOString().slice(0, 10)
-        await supabase.from('shibutzim').update({ status: 'הסתיים', taarich_siyum: endDate }).eq('id', existingShib.id)
-      }
+    // בדיקת שיבוץ כפול
+    if (isNew && existingShibRes.data) {
+      const existingShib = existingShibRes.data
+      const d = existingShib.dirot
+      const addr = d ? `${d.ktovet ?? ''}${d.ir ? ', ' + d.ir : ''}` : '—'
+      const go = await confirm(
+        `בחור זה כבר משובץ בדירה "${addr}".\nלסיים את השיבוץ הנוכחי ולהעביר אותו לדירה החדשה?`,
+        { confirmText: 'העבר', cancelText: 'ביטול' }
+      )
+      if (!go) { setSaving(false); return }
+      const endDate = form.taarich_tchila || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' })
+      await supabase.from('shibutzim').update({ status: 'הסתיים', taarich_siyum: endDate }).eq('id', existingShib.id)
     }
 
-    // ── בדיקה לפני שמירה: קיצור תקופת שיבוץ → שאל על שורות גבייה ──
-    if (!isNew && form.taarich_siyum && originalSiyum && form.taarich_siyum !== originalSiyum) {
-      const newEnd = new Date(form.taarich_siyum + 'T12:00:00')
-      const oldEnd = new Date(originalSiyum + 'T12:00:00')
-      if (newEnd < oldEnd) {
-        const newEndYM = form.taarich_siyum.slice(0, 7)
-        const { data: extraGviya } = await supabase.from('gviya')
-          .select('id, status, chodesh')
-          .eq('bochurim_id', form.bochurim_id)
-          .eq('dirot_id', form.dirot_id)
-          .gt('chodesh', newEndYM)
-        if (extraGviya?.length > 0) {
-          const paid = extraGviya.filter(r => r.status === 'שולם').length
-          const unpaid = extraGviya.length - paid
-          const paidNote = paid > 0 ? `\n⚠️ ${paid} מהן כבר שולמו!` : ''
-          const ok = await confirm(
-            `הקיצור ייסיר ${extraGviya.length} שורות גבייה (${unpaid} לא שולמו${paidNote}).\n\nהאם למחוק אותן?`,
-            { danger: true, confirmText: 'מחק', cancelText: 'ביטול (שמור חודשים)' }
-          )
-          if (!ok) { setSaving(false); return }
-        }
-      }
+    // בדיקת קיצור תקופה
+    if (isEditShortening && (extraGviyaRes.data ?? []).length > 0) {
+      const extraGviya = extraGviyaRes.data
+      const paid = extraGviya.filter(r => r.status === 'שולם').length
+      const unpaid = extraGviya.length - paid
+      const paidNote = paid > 0 ? `\n⚠️ ${paid} מהן כבר שולמו!` : ''
+      const ok = await confirm(
+        `הקיצור ייסיר ${extraGviya.length} שורות גבייה (${unpaid} לא שולמו${paidNote}).\n\nהאם למחוק אותן?`,
+        { danger: true, confirmText: 'מחק', cancelText: 'ביטול (שמור חודשים)' }
+      )
+      if (!ok) { setSaving(false); return }
     }
 
     // שמירת השיבוץ (olla_lebach יתעדכן ע"י recalcBilling)
