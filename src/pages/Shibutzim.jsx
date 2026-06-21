@@ -188,10 +188,10 @@ export default function Shibutzim() {
       updates.push({ id: gviya.id, bochurimId: gviya.bochurim_id, skhum: split })
     }
 
-    // עדכון כל השורות
-    for (const u of updates) {
-      await supabase.from('gviya').update({ skhum: u.skhum }).eq('id', u.id)
-    }
+    // עדכון במקביל (ולא סדרתי)
+    await Promise.all(updates.map(u =>
+      supabase.from('gviya').update({ skhum: u.skhum }).eq('id', u.id)
+    ))
 
     const uniqueSplits = [...new Set(updates.map(u => u.skhum))]
     if (uniqueSplits.length === 1) {

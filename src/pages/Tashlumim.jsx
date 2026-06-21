@@ -41,9 +41,9 @@ export default function Tashlumim() {
   const [form, setForm]       = useState(EMPTY)
   const [saving, setSaving]   = useState(false)
 
-  const today = new Date(); today.setHours(0,0,0,0)
+  const todayDate = new Date(); todayDate.setHours(0,0,0,0)
   function isOverdue(row) {
-    return row.status !== 'שולם' && row.taarich && new Date(row.taarich) < today
+    return row.status !== 'שולם' && row.taarich && new Date(row.taarich) < todayDate
   }
 
   const load = useCallback(async (silent = false) => {
@@ -76,7 +76,7 @@ export default function Tashlumim() {
   const totalDebt    = totalCharged - totalPaid
   const pct          = totalCharged > 0 ? Math.round((totalPaid/totalCharged)*100) : 0
 
-  function openNew()  { setForm({ ...EMPTY, taarich: today() }); setModal(true) }
+  function openNew()  { setForm({ ...EMPTY, taarich: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' }) }); setModal(true) }
   function openEdit(r){ setForm({ ...EMPTY, ...r, taarich: toInputDate(r.taarich) }); setModal(true) }
   function set(field) { return e => setForm(f => ({ ...f, [field]: e.target.value })) }
 
@@ -125,13 +125,21 @@ export default function Tashlumim() {
   }
 
   async function deleteAll() {
+    // מחיקה קבוצתית רק אם יש סינון פעיל (לא מאפשר מחיקת הכל ללא סינון)
+    if (!statusFilter && !monthFilter && !search) {
+      toast('יש לסנן לפני מחיקה קבוצתית — בחר סטטוס, חודש או חפש', 'error')
+      return
+    }
+    const toDelete = filtered.filter(r => r.status !== 'שולם')
+    if (toDelete.length === 0) { toast('אין רשומות לא שולמו למחיקה', 'error'); return }
     if (!await confirm(
-      `למחוק את כל ${rows.length} הרשומות בתשלומים לבעלים?\n\nפעולה זו בלתי הפיכה לחלוטין.`,
-      { danger: true, confirmText: 'מחק הכל', cancelText: 'ביטול' }
+      `למחוק ${toDelete.length} רשומות לא שולמו?\n\nפעולה זו בלתי הפיכה.`,
+      { danger: true, confirmText: 'מחק', cancelText: 'ביטול' }
     )) return
-    const { error } = await supabase.from('tashlumim_baalim').delete().not('id', 'is', null)
+    const ids = toDelete.map(r => r.id)
+    const { error } = await supabase.from('tashlumim_baalim').delete().in('id', ids)
     if (error) { toast(error.message, 'error'); return }
-    toast('כל הרשומות נמחקו')
+    toast(`נמחקו ${ids.length} רשומות`)
     load(true)
   }
 
@@ -237,11 +245,13 @@ export default function Tashlumim() {
           })), 'tashlumim_baalim.csv')}>
           ייצוא
         </Button>
-        <button onClick={deleteAll}
-          className="h-9 px-3 text-sm rounded-lg border border-red-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-400 flex items-center gap-1.5 transition-colors">
-          <Trash2 size={14}/>
-          מחק הכל
-        </button>
+        {(statusFilter || monthFilter || search) && (
+          <button onClick={deleteAll}
+            className="h-9 px-3 text-sm rounded-lg border border-red-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-400 flex items-center gap-1.5 transition-colors">
+            <Trash2 size={14}/>
+            מחק מסוננים
+          </button>
+        )}
         <Button icon={PlusCircle} onClick={openNew}>תשלום חדש</Button>
       </div>
 
