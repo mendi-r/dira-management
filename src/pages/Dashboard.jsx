@@ -44,59 +44,43 @@ export default function Dashboard() {
     }
 
     setLoading(true)
-    // שעון ישראל
-    const currentMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' }).slice(0,7)
-    const [cy, cm] = currentMonth.split('-').map(Number)
-    const nextMonth = cm === 12 ? `${cy+1}-01` : `${cy}-${String(cm+1).padStart(2,'0')}`
-    // חובות פתוחים — רק 12 חודשים אחרונים (מניעת שאילתה בלתי מוגבלת)
-    const debtSince = `${cy-1}-${String(cm).padStart(2,'0')}`
 
-    const [
-      { count: bochurimCount },
-      { count: dirotCount },
-      { data: shibutzim },
-      { data: dirot },
-      { data: allBochurim },
-      { data: gviyaOpen },
-      { data: tachzukaOpen },
-      { data: gviyaMonth },
-      { data: tashlumimMonth },
-      { data: monimMonth },
-    ] = await Promise.all([
-      supabase.from('bochurim').select('*', { count:'exact', head:true }),
-      supabase.from('dirot').select('*', { count:'exact', head:true }),
-      supabase.from('shibutzim')
-        .select('dirot_id, bochurim_id, ola_lebach, bochurim!bochurim_id(shem,mishpacha), dirot!dirot_id(ktovet,mispar_mitot)')
-        .eq('status', 'פעיל'),
-      supabase.from('dirot').select('id,ktovet,ir,mispar_mitot,ola_schirut_chodshi,sofit_schirut,bituach_chadush,status'),
-      supabase.from('bochurim').select('id,shem,mishpacha').eq('status','פעיל'),
-      // חובות — מוגבל ל-12 חודשים אחרונים למניעת שאילתה בלתי מוגבלת
-      supabase.from('gviya').select('bochurim!bochurim_id(shem,mishpacha,telefon),skhum,skhum_shulam,taarich,status')
-        .neq('status','שולם').gte('chodesh', debtSince).order('taarich'),
-      supabase.from('tachzuka').select('id,teur,status,adifut,dirot(ktovet)')
-        .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
-      supabase.from('gviya').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
-      supabase.from('tashlumim_baalim').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
-      supabase.from('riut').select('sug_mone,skhum_leshalem,dirot_id')
-        .gte('taarich_kriah', `${currentMonth}-01`)
-        .lt('taarich_kriah', `${nextMonth}-01`)
-        .eq('is_kriah_ptika', false),
-    ])
+    // ── קריאת RPC אחת במקום 10 שאילתות נפרדות ──
+    const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats')
+    if (rpcError || !stats) {
+      console.error('Dashboard RPC error:', rpcError)
+      setLoading(false)
+      return
+    }
 
-    const totalBeds    = (dirot??[]).reduce((s,d) => s + Number(d.mispar_mitot??0), 0)
-    const occupiedBeds = (shibutzim??[]).length
+    // שיוך תוצאות ה-RPC למשתנים זהים לקוד הקיים
+    const bochurimCount  = stats.bochurim_count  ?? 0
+    const dirotCount     = stats.dirot_count     ?? 0
+    const currentMonth   = stats.current_month
+    const shibutzim      = stats.shibutzim       ?? []
+    const dirot          = stats.dirot           ?? []
+    const allBochurim    = stats.active_bochurim ?? []
+    const gviyaOpen      = stats.gviya_open      ?? []
+    const tachzukaOpen   = stats.tachzuka_open   ?? []
+    const gviyaTotal     = Number(stats.gviya_total     ?? 0)
+    const gviyaCollected = Number(stats.gviya_collected ?? 0)
+    const tashlumimTotal = Number(stats.tashlumim_total ?? 0)
+    const monimMonth     = stats.monim           ?? []
+
+    const totalBeds    = dirot.reduce((s,d) => s + Number(d.mispar_mitot??0), 0)
+    const occupiedBeds = shibutzim.length
     const freeBeds     = Math.max(0, totalBeds - occupiedBeds)
 
     // בחורים ללא שיבוץ פעיל
-    const activeIds = new Set((shibutzim??[]).map(s => s.bochurim_id))
-    const unassigned = (allBochurim??[]).filter(b => !activeIds.has(b.id))
+    const activeIds  = new Set(shibutzim.map(s => s.bochurim_id))
+    const unassigned = allBochurim.filter(b => !activeIds.has(b.id))
 
     const shibutzimByDira = {}
-    ;(shibutzim??[]).forEach(s => {
+    shibutzim.forEach(s => {
       if (!shibutzimByDira[s.dirot_id]) shibutzimByDira[s.dirot_id] = 0
       shibutzimByDira[s.dirot_id]++
     })
-    const dirotStats = (dirot??[]).map(d => {
+    const dirotStats = dirot.map(d => {
       const n = shibutzimByDira[d.id] ?? 0
       const total = d.mispar_mitot ?? 0
       return { ...d, occupants: n, status_calc: n === 0 ? 'פנוי' : n >= total ? 'מלא' : 'חלקי' }
@@ -104,24 +88,21 @@ export default function Dashboard() {
     // דירות עם לפחות מיטה פנויה אחת
     const freeApartments = dirotStats.filter(d => d.occupants < Number(d.mispar_mitot ?? 0)).length
 
-    // כספים — שני זרמים (סה"כ חיוב החודש, לא מה ששולם)
-    const gviyaTotal       = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum??0), 0)
-    const gviyaCollected   = (gviyaMonth??[]).reduce((s,g) => s + Number(g.skhum_shulam??0), 0)
+    // כספים
     const gviyaOutstanding = Math.max(0, gviyaTotal - gviyaCollected)
-    const tashlumimTotal = (tashlumimMonth??[]).reduce((s,t) => s + Number(t.skhum??0), 0)
-    const netProfit      = gviyaTotal - tashlumimTotal
+    const netProfit        = gviyaTotal - tashlumimTotal
 
     // חישוב שירותים החודש
     const utilTypes = { חשמל: 0, מים: 0, גז: 0 }
-    ;(monimMonth ?? []).forEach(m => {
+    monimMonth.forEach(m => {
       const v = Number(m.skhum_leshalem ?? 0)
       if (v > 0 && utilTypes[m.sug_mone] !== undefined) utilTypes[m.sug_mone] += v
     })
-    const utilityTotal = utilTypes.חשמל + utilTypes.מים + utilTypes.גז
-    const dirotWithReadings = new Set((monimMonth ?? []).map(m => m.dirot_id)).size
+    const utilityTotal      = utilTypes.חשמל + utilTypes.מים + utilTypes.גז
+    const dirotWithReadings = new Set(monimMonth.map(m => m.dirot_id)).size
 
     const debtByBochur = {}
-    ;(gviyaOpen??[]).forEach(g => {
+    gviyaOpen.forEach(g => {
       const key = g.bochurim ? `${g.bochurim.shem} ${g.bochurim.mishpacha}` : '—'
       const debt = Number(g.skhum??0) - Number(g.skhum_shulam??0)
       if (!debtByBochur[key]) debtByBochur[key] = { name:key, total: 0 }
@@ -129,11 +110,11 @@ export default function Dashboard() {
     })
     const openDebts = Object.values(debtByBochur).filter(d => d.total > 0).sort((a,b) => b.total - a.total)
 
-    const overdueCount     = (gviyaOpen??[]).filter(g => g.taarich && new Date(g.taarich) < new Date()).length
-    const contractEndCount = (dirot??[]).filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
+    const overdueCount     = gviyaOpen.filter(g => g.taarich && new Date(g.taarich) < new Date()).length
+    const contractEndCount = dirot.filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
 
     const result = {
-      bochurimCount, dirotCount, shibutzimCount: (shibutzim??[]).length,
+      bochurimCount, dirotCount, shibutzimCount: shibutzim.length,
       totalBeds, occupiedBeds, freeBeds, freeApartments,
       unassigned,
       gviyaTotal, gviyaCollected, gviyaOutstanding,
