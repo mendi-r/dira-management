@@ -50,14 +50,21 @@ export default function Tashlumim() {
     if (!silent) setLoading(true)
     let q = supabase.from('tashlumim_baalim')
       .select('*, dirot(ktovet,ir,baalim_shem,baalim_telefon1)')
-      .order('taarich', { ascending: true })
     if (statusFilter) q = q.eq('status', statusFilter)
     if (monthFilter)  q = q.eq('chodesh', monthFilter)
     const [{ data: t }, { data: d }] = await Promise.all([
       q,
       supabase.from('dirot').select('id,ktovet,ir,baalim_shem,ola_schirut_chodshi,payment_day').order('ktovet'),
     ])
-    setRows(t ?? [])
+    // מיון יציב: לפי כתובת דירה, אחר כך לפי חודש
+    const sorted = (t ?? []).slice().sort((a, b) => {
+      const addrA = `${a.dirot?.ktovet ?? ''} ${a.dirot?.ir ?? ''}`.trim()
+      const addrB = `${b.dirot?.ktovet ?? ''} ${b.dirot?.ir ?? ''}`.trim()
+      const cmp = addrA.localeCompare(addrB, 'he')
+      if (cmp !== 0) return cmp
+      return (a.chodesh ?? '').localeCompare(b.chodesh ?? '')
+    })
+    setRows(sorted)
     setDirot(d ?? [])
     setLoading(false)
   }, [statusFilter, monthFilter])
@@ -145,14 +152,29 @@ export default function Tashlumim() {
 
   async function togglePaid(row) {
     const isFullyPaid = row.status === 'שולם'
+    const newSkhum    = isFullyPaid ? 0 : Number(row.skhum)
+    const newStatus   = isFullyPaid ? 'לא שולם' : 'שולם'
+
+    // עדכון מקומי מיידי — שומר על מיקום השורה ומונע קפיצה
+    setRows(prev => prev.map(r => r.id === row.id
+      ? { ...r, skhum_shulam: newSkhum, status: newStatus }
+      : r
+    ))
+
     const { error } = await supabase.from('tashlumim_baalim').update(
       isFullyPaid
         ? { skhum_shulam: 0, status: 'לא שולם' }
         : { skhum_shulam: row.skhum, status: 'שולם' }
     ).eq('id', row.id)
-    if (error) { toast(error.message, 'error'); return }
+
+    if (error) {
+      // שחזור מצב קודם אם נכשל
+      setRows(prev => prev.map(r => r.id === row.id ? row : r))
+      toast(error.message, 'error')
+      return
+    }
     toast(isFullyPaid ? 'סומן כלא שולם' : 'שולם ✓')
-    load(true)
+    // אין load(true) — השורה עודכנה במקום, המיקום נשמר
   }
 
   function clearFilters() {

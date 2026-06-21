@@ -32,8 +32,9 @@ function Clickable({ to, params = {}, children, className = '' }) {
 export default function Dashboard() {
   const navigate  = useNavigate()
   const { alerts } = useAlerts()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // אתחול ישיר מהמטמון — אם קיים, הרנדר הראשון כבר מציג תוכן ללא ספינר
+  const [data, setData]       = useState(() => getCache(DASHBOARD_CACHE_KEY))
+  const [loading, setLoading] = useState(() => getCache(DASHBOARD_CACHE_KEY) === null)
 
   const load = useCallback(async (force = false) => {
     // ── מטמון: אם לא force ויש נתונים טריים — הצג מיד ──
