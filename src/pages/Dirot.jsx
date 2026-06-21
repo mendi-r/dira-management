@@ -235,67 +235,71 @@ export default function Dirot() {
     if (error) { toast(error.message, 'error'); return }
     logActivity(isNew ? 'INSERT' : 'UPDATE', 'dirot', data.id, form.ktovet)
 
-    // עדכון רטרואקטיבי — כשסכום שכירות משתנה, עדכן שורות גבייה פתוחות
-    const rentChanged = payload.ola_schirut_chodshi !== null &&
-      payload.ola_schirut_chodshi !== Number(originalRent)
-    if (!isNew && rentChanged) {
-      const { count: occupants } = await supabase
-        .from('shibutzim')
-        .select('*', { count: 'exact', head: true })
-        .eq('dirot_id', data.id)
-        .eq('status', 'פעיל')
-      if (occupants > 0) {
-        const newSplit = Math.round(payload.ola_schirut_chodshi / occupants)
-        const { data: updated } = await supabase
-          .from('gviya')
-          .update({ skhum: newSplit })
-          .eq('dirot_id', data.id)
-          .eq('status', 'לא שולם')
-          .select('id')
-        if (updated?.length > 0)
-          toast(`עודכנו ${updated.length} שורות גבייה ל-₪${newSplit.toLocaleString('he-IL')}/ח`)
-      }
-    }
-
-    // יצירת תשלומים לבעלים אוטומטית לדירה חדשה עם תאריך תחילה + חודשים + סכום
-    if (isNew && payload.tchilat_schirut && payload.mispar_chodashim && payload.ola_schirut_chodshi) {
-      await createOwnerPayments(data.id, payload.tchilat_schirut, payload.mispar_chodashim,
-        payload.ola_schirut_chodshi, payload.payment_day ?? 1)
-      // רישום החוזה הראשון בהיסטוריית חוזים
-      await supabase.from('chozim').insert({
-        dirot_id: data.id,
-        tchilat_schirut: payload.tchilat_schirut,
-        sofit_schirut: payload.sofit_schirut || null,
-        mispar_chodashim: payload.mispar_chodashim,
-        ola_schirut_chodshi: payload.ola_schirut_chodshi,
-        status: 'פעיל',
-      })
-    }
-
-    // הגדלת חודשי שכירות: יצירת תשלומים לחודשים החדשים (גם אם לא היו בכלל)
-    if (!isNew && payload.mispar_chodashim && payload.tchilat_schirut &&
-        payload.mispar_chodashim > Number(originalMisparChodashim ?? 0)) {
-      await addOwnerPaymentMonths(
-        data.id, payload.tchilat_schirut,
-        Number(originalMisparChodashim ?? 0), payload.mispar_chodashim,
-        payload.ola_schirut_chodshi, payload.payment_day ?? 1
-      )
-    }
-
-    // קיצור חודשי שכירות: מחיקת תשלומים שהוסרו (המשתמש אישר לעיל)
-    if (!isNew && payload.mispar_chodashim && originalMisparChodashim &&
-        payload.mispar_chodashim < Number(originalMisparChodashim) &&
-        payload.tchilat_schirut) {
-      const cutoffYM = monthAt(payload.tchilat_schirut, payload.mispar_chodashim)
-      await supabase.from('tashlumim_baalim')
-        .delete()
-        .eq('dirot_id', data.id)
-        .gte('chodesh', cutoffYM)
-    }
-
+    // ── פידבק מיידי למשתמש ──
     toast(isNew ? 'דירה נוספה' : 'עודכן')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
-    load(true)
+
+    // ── פעולות רקע (לא חוסמות את ה-UI) ──
+    ;(async () => {
+      // עדכון רטרואקטיבי — כשסכום שכירות משתנה, עדכן שורות גבייה פתוחות
+      const rentChanged = payload.ola_schirut_chodshi !== null &&
+        payload.ola_schirut_chodshi !== Number(originalRent)
+      if (!isNew && rentChanged) {
+        const { count: occupants } = await supabase
+          .from('shibutzim')
+          .select('*', { count: 'exact', head: true })
+          .eq('dirot_id', data.id)
+          .eq('status', 'פעיל')
+        if (occupants > 0) {
+          const newSplit = Math.round(payload.ola_schirut_chodshi / occupants)
+          const { data: updated } = await supabase
+            .from('gviya')
+            .update({ skhum: newSplit })
+            .eq('dirot_id', data.id)
+            .eq('status', 'לא שולם')
+            .select('id')
+          if (updated?.length > 0)
+            toast(`עודכנו ${updated.length} שורות גבייה ל-₪${newSplit.toLocaleString('he-IL')}/ח`)
+        }
+      }
+
+      // יצירת תשלומים לבעלים אוטומטית לדירה חדשה
+      if (isNew && payload.tchilat_schirut && payload.mispar_chodashim && payload.ola_schirut_chodshi) {
+        await createOwnerPayments(data.id, payload.tchilat_schirut, payload.mispar_chodashim,
+          payload.ola_schirut_chodshi, payload.payment_day ?? 1)
+        await supabase.from('chozim').insert({
+          dirot_id: data.id,
+          tchilat_schirut: payload.tchilat_schirut,
+          sofit_schirut: payload.sofit_schirut || null,
+          mispar_chodashim: payload.mispar_chodashim,
+          ola_schirut_chodshi: payload.ola_schirut_chodshi,
+          status: 'פעיל',
+        })
+      }
+
+      // הגדלת חודשי שכירות
+      if (!isNew && payload.mispar_chodashim && payload.tchilat_schirut &&
+          payload.mispar_chodashim > Number(originalMisparChodashim ?? 0)) {
+        await addOwnerPaymentMonths(
+          data.id, payload.tchilat_schirut,
+          Number(originalMisparChodashim ?? 0), payload.mispar_chodashim,
+          payload.ola_schirut_chodshi, payload.payment_day ?? 1
+        )
+      }
+
+      // קיצור חודשי שכירות
+      if (!isNew && payload.mispar_chodashim && originalMisparChodashim &&
+          payload.mispar_chodashim < Number(originalMisparChodashim) &&
+          payload.tchilat_schirut) {
+        const cutoffYM = monthAt(payload.tchilat_schirut, payload.mispar_chodashim)
+        await supabase.from('tashlumim_baalim')
+          .delete()
+          .eq('dirot_id', data.id)
+          .gte('chodesh', cutoffYM)
+      }
+
+      load(true)
+    })()
   }
 
   /** יצירת שורות תשלום לבעלים לכל חודשי השכירות */

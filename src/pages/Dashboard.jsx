@@ -6,6 +6,10 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, daysUntil, currency } from '../lib/utils'
+import { getCache, setCache } from '../lib/cache'
+
+const DASHBOARD_CACHE_KEY = 'dashboard_v1'
+const DASHBOARD_TTL = 60_000  // 60 שניות
 import { StatCard, Card, CardHeader, CardBody } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import AlertBanner from '../components/ui/AlertBanner'
@@ -31,12 +35,20 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    // ── מטמון: אם לא force ויש נתונים טריים — הצג מיד ──
+    if (!force) {
+      const cached = getCache(DASHBOARD_CACHE_KEY)
+      if (cached) { setData(cached); setLoading(false); return }
+    }
+
     setLoading(true)
     // שעון ישראל
     const currentMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' }).slice(0,7)
     const [cy, cm] = currentMonth.split('-').map(Number)
     const nextMonth = cm === 12 ? `${cy+1}-01` : `${cy}-${String(cm+1).padStart(2,'0')}`
+    // חובות פתוחים — רק 12 חודשים אחרונים (מניעת שאילתה בלתי מוגבלת)
+    const debtSince = `${cy-1}-${String(cm).padStart(2,'0')}`
 
     const [
       { count: bochurimCount },
@@ -57,8 +69,9 @@ export default function Dashboard() {
         .eq('status', 'פעיל'),
       supabase.from('dirot').select('id,ktovet,ir,mispar_mitot,ola_schirut_chodshi,sofit_schirut,bituach_chadush,status'),
       supabase.from('bochurim').select('id,shem,mishpacha').eq('status','פעיל'),
+      // חובות — מוגבל ל-12 חודשים אחרונים למניעת שאילתה בלתי מוגבלת
       supabase.from('gviya').select('bochurim!bochurim_id(shem,mishpacha,telefon),skhum,skhum_shulam,taarich,status')
-        .neq('status','שולם').order('taarich'),
+        .neq('status','שולם').gte('chodesh', debtSince).order('taarich'),
       supabase.from('tachzuka').select('id,teur,status,adifut,dirot(ktovet)')
         .neq('status','סגור').order('created_at', { ascending:false }).limit(5),
       supabase.from('gviya').select('skhum,skhum_shulam').eq('chodesh', currentMonth),
@@ -118,7 +131,7 @@ export default function Dashboard() {
     const overdueCount     = (gviyaOpen??[]).filter(g => g.taarich && new Date(g.taarich) < new Date()).length
     const contractEndCount = (dirot??[]).filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
 
-    setData({
+    const result = {
       bochurimCount, dirotCount, shibutzimCount: (shibutzim??[]).length,
       totalBeds, occupiedBeds, freeBeds, freeApartments,
       unassigned,
@@ -129,13 +142,15 @@ export default function Dashboard() {
       overdueCount, contractEndCount,
       currentMonth,
       utilTypes, utilityTotal, dirotWithReadings,
-    })
+    }
+    setCache(DASHBOARD_CACHE_KEY, result, DASHBOARD_TTL)
+    setData(result)
     setLoading(false)
   }, [])
 
   useEffect(() => {
     load()
-    // רענון אוטומטי כשחוזרים לחלון
+    // רענון כשחוזרים לחלון — משתמש במטמון אם טרי
     const onVisible = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
@@ -162,7 +177,7 @@ export default function Dashboard() {
             {new Date().toLocaleDateString('he-IL', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
           </p>
         </div>
-        <button onClick={load} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן נתונים">
+        <button onClick={() => load(true)} className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300" title="רענן נתונים">
           <RefreshCw size={16}/>
         </button>
       </div>
