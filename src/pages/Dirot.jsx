@@ -238,6 +238,8 @@ export default function Dirot() {
     // ── פידבק מיידי למשתמש ──
     toast(isNew ? 'דירה נוספה' : 'עודכן')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
+    setModal(false)
+    load(true)   // רענון מיידי של הרשימה
 
     // ── פעולות רקע (לא חוסמות את ה-UI) ──
     ;(async () => {
