@@ -237,9 +237,14 @@ export default function Dirot() {
 
     // ── פידבק מיידי למשתמש ──
     toast(isNew ? 'דירה נוספה' : 'עודכן')
-    if (isNew) setForm(f => ({ ...f, id: data.id }))
     setModal(false)
-    load(true)   // רענון מיידי של הרשימה
+    if (isNew) {
+      setForm(f => ({ ...f, id: data.id }))
+      // הוסף מיד לרשימה המקומית — אפס המתנה
+      setRows(prev => [...prev, data].sort((a,b) => (a.ktovet??'').localeCompare(b.ktovet??'','he')))
+    } else {
+      setRows(prev => prev.map(r => r.id === data.id ? { ...r, ...data } : r))
+    }
 
     // ── פעולות רקע (לא חוסמות את ה-UI) ──
     ;(async () => {
