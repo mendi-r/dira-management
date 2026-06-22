@@ -43,26 +43,12 @@ export default function UserManagement() {
 
   async function invite() {
     if (!form.email) { toast('יש להזין כתובת אימייל','error'); return }
-    setInviting(true)
-    // Invite user via Supabase Auth (admin invite)
-    const { data, error } = await supabase.auth.admin.inviteUserByEmail(form.email, {
-      data: { role: form.role }
-    })
-    if (error) {
-      // Fallback: just create a users_roles entry with the pending email
-      const { error: e2 } = await supabase.from('users_roles').insert({
-        user_id: crypto.randomUUID(), // placeholder, will be replaced on signup
-        role: form.role,
-      })
-      if (e2) { toast(e2.message, 'error'); setInviting(false); return }
-      toast('משתמש הוגדר — יש לשלוח לו את קישור ההרשמה בנפרד', 'info')
-    } else {
-      toast(`הזמנה נשלחה ל-${form.email}`)
-    }
-    setInviting(false)
+    // הוספת משתמש: יש ליצור אותו תחילה ב-Supabase Auth Dashboard,
+    // ואז להגדיר את ה-user_id שלו כאן.
+    // ממשק זה מציג הנחיות למנהל.
     setInviteModal(false)
     setForm(EMPTY_INVITE)
-    load()
+    toast('לפרטי הוספת משתמש — ראה הוראות בתחתית העמוד', 'info')
   }
 
   async function updateRole(id, newRole) {
@@ -183,6 +169,19 @@ export default function UserManagement() {
             </div>
           ))}
         </div>
+      </Card>
+
+      {/* הוראות הוספת משתמש */}
+      <Card>
+        <CardHeader title="כיצד להוסיף משתמש חדש?"/>
+        <CardBody>
+          <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside">
+            <li>כנס ל-<a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline">Supabase Dashboard</a> ← Authentication ← Users</li>
+            <li>לחץ <strong>"Invite user"</strong> והכנס את האימייל של המשתמש</li>
+            <li>לאחר שהמשתמש קיבל הזמנה ונרשם, העתק את ה-<strong>User UUID</strong> שלו מהדשבורד</li>
+            <li>הרץ ב-SQL Editor: <code className="bg-slate-100 px-1 rounded text-xs">INSERT INTO users_roles (user_id, role) VALUES ('UUID_של_המשתמש', 'admin');</code></li>
+          </ol>
+        </CardBody>
       </Card>
 
       {/* Invite Modal */}

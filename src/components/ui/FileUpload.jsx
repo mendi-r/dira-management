@@ -3,6 +3,7 @@ import { Upload, FileText, Trash2, ExternalLink, Loader2, Link as LinkIcon } fro
 import { supabase } from '../../lib/supabase'
 import { useToast } from './Toast'
 import { Input, FormField } from './FormField'
+import { confirm } from '../../lib/confirm'
 import Button from './Button'
 
 /**
@@ -77,7 +78,7 @@ export default function FileUpload({ entityType, entityId, bucket = 'documents' 
   }
 
   async function removeDoc(doc) {
-    if (!confirm('למחוק מסמך זה?')) return
+    if (!await confirm('למחוק מסמך זה?', { danger: true })) return
     if (doc.file_url) {
       // extract path from URL
       const parts = doc.file_url.split(`/${bucket}/`)

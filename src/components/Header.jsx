@@ -12,6 +12,7 @@ const titles = {
   '/gviya':      'גבייה',
   '/tachzuka':   'תחזוקה',
   '/monim':      'קריאות מונים',
+  '/tashlumim':  'תשלומים לבעלים',
   '/hagdarot':   'הגדרות',
   '/reports':    'דוחות כספיים',
   '/calendar':   'לוח שנה',

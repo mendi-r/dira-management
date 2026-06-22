@@ -29,10 +29,10 @@ export default function Hagdarot() {
     if (sugFilter) q = q.eq('sug', sugFilter)
     const { data } = await q
     setRows(data ?? [])
-    const { data: pd } = await supabase.from('hagdarot').select('mafteach,erech')
-      .in('mafteach', ['PRICE_HASHMAL','PRICE_MAYIM','PRICE_GAZ'])
+    // חשב מחירי מונים מהנתונים שכבר נטענו — ללא שאילתה נוספת
     const pm = {}
-    ;(pd ?? []).forEach(h => { pm[h.mafteach] = h.erech })
+    ;(data ?? []).filter(h => ['PRICE_HASHMAL','PRICE_MAYIM','PRICE_GAZ'].includes(h.mafteach))
+      .forEach(h => { pm[h.mafteach] = h.erech })
     setMoneimPrices({ hashmal: pm['PRICE_HASHMAL'] ?? '', mayim: pm['PRICE_MAYIM'] ?? '', gaz: pm['PRICE_GAZ'] ?? '' })
     setLoading(false)
   }, [sugFilter])
@@ -74,11 +74,13 @@ export default function Hagdarot() {
 
   async function saveMoneimPrices() {
     setPricesSaving(true)
-    const { error } = await supabase.rpc('save_monim_prices', {
-      p_hashmal: String(moneimPrices.hashmal ?? ''),
-      p_mayim:   String(moneimPrices.mayim   ?? ''),
-      p_gaz:     String(moneimPrices.gaz     ?? ''),
-    })
+    const rows = [
+      { mafteach: 'PRICE_HASHMAL', erech: String(moneimPrices.hashmal ?? ''), sug: 'מונים', teur: 'מחיר חשמל לקוט"ש' },
+      { mafteach: 'PRICE_MAYIM',   erech: String(moneimPrices.mayim   ?? ''), sug: 'מונים', teur: 'מחיר מים לקוב' },
+      { mafteach: 'PRICE_GAZ',     erech: String(moneimPrices.gaz     ?? ''), sug: 'מונים', teur: 'מחיר גז למ"ק' },
+    ]
+    const { error } = await supabase.from('hagdarot')
+      .upsert(rows, { onConflict: 'mafteach' })
     setPricesSaving(false)
     if (error) { toast('שגיאה: ' + error.message, 'error'); return }
     toast('מחירי מונים עודכנו ✓')

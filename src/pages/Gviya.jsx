@@ -133,9 +133,9 @@ export default function Gviya() {
     load(true)
   }
 
-  const today = new Date(); today.setHours(0,0,0,0)
+  const todayDate = new Date(); todayDate.setHours(0,0,0,0)
   function isOverdue(row) {
-    return row.status !== 'שולם' && row.taarich && new Date(row.taarich) < today
+    return row.status !== 'שולם' && row.taarich && new Date(row.taarich) < todayDate
   }
 
   function clearFilters() {

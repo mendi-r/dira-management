@@ -7,13 +7,13 @@ import {
 import { supabase } from '../lib/supabase'
 import { formatDate, daysUntil, currency } from '../lib/utils'
 import { getCache, setCache } from '../lib/cache'
-
-const DASHBOARD_CACHE_KEY = 'dashboard_v1'
-const DASHBOARD_TTL = 60_000  // 60 שניות
 import { StatCard, Card, CardHeader, CardBody } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import AlertBanner from '../components/ui/AlertBanner'
 import { useAlerts } from '../contexts/AlertsContext'
+
+const DASHBOARD_CACHE_KEY = 'dashboard_v1'
+const DASHBOARD_TTL = 60_000  // 60 שניות
 
 /** Clickable wrapper that navigates with optional URL search params */
 function Clickable({ to, params = {}, children, className = '' }) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle, TrendingDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
 import { confirm } from '../lib/confirm'
@@ -11,7 +11,6 @@ import Badge from '../components/ui/Badge'
 import { StatCard } from '../components/ui/Card'
 import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
 import { useToast } from '../components/ui/Toast'
-import { TrendingDown } from 'lucide-react'
 
 function exportCSV(data, filename) {
   if (!data.length) return
