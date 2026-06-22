@@ -74,13 +74,28 @@ export default function Hagdarot() {
 
   async function saveMoneimPrices() {
     setPricesSaving(true)
-    const { error } = await supabase.rpc('save_monim_prices', {
-      p_hashmal: String(moneimPrices.hashmal ?? '0'),
-      p_mayim:   String(moneimPrices.mayim   ?? '0'),
-      p_gaz:     String(moneimPrices.gaz     ?? '0'),
-    })
+    const entries = [
+      { mafteach: 'PRICE_HASHMAL', erech: String(moneimPrices.hashmal ?? '0'), teur: 'מחיר חשמל לקוט"ש' },
+      { mafteach: 'PRICE_MAYIM',   erech: String(moneimPrices.mayim   ?? '0'), teur: 'מחיר מים לקוב' },
+      { mafteach: 'PRICE_GAZ',     erech: String(moneimPrices.gaz     ?? '0'), teur: 'מחיר גז למ"ק' },
+    ]
+    // שלוף שורות קיימות לפי ID
+    const { data: existing } = await supabase
+      .from('hagdarot').select('id,mafteach')
+      .in('mafteach', entries.map(e => e.mafteach))
+    let err = null
+    for (const entry of entries) {
+      const found = existing?.find(r => r.mafteach === entry.mafteach)
+      if (found) {
+        const { error } = await supabase.from('hagdarot').update({ erech: entry.erech }).eq('id', found.id)
+        if (error) { err = error; break }
+      } else {
+        const { error } = await supabase.from('hagdarot').insert({ mafteach: entry.mafteach, erech: entry.erech, sug: 'מונים', teur: entry.teur })
+        if (error) { err = error; break }
+      }
+    }
     setPricesSaving(false)
-    if (error) { toast('שגיאה: ' + error.message, 'error'); return }
+    if (err) { toast('שגיאה: ' + err.message, 'error'); return }
     toast('מחירי מונים עודכנו ✓')
     await load()
   }
