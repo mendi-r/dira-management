@@ -144,6 +144,10 @@ export default function Dashboard() {
     </div>
   )
 
+  if (!data) return (
+    <div className="flex items-center justify-center py-24 text-gray-500">שגיאה בטעינת הנתונים — נסה לרענן</div>
+  )
+
   const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds, freeApartments,
           unassigned, gviyaTotal, gviyaCollected, gviyaOutstanding,
           tashlumimTotal, netProfit, dirotStats, openDebts,
