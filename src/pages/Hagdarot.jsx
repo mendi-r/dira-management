@@ -74,13 +74,16 @@ export default function Hagdarot() {
 
   async function saveMoneimPrices() {
     setPricesSaving(true)
+    const keys = ['PRICE_HASHMAL', 'PRICE_MAYIM', 'PRICE_GAZ']
     const rows = [
       { mafteach: 'PRICE_HASHMAL', erech: String(moneimPrices.hashmal ?? ''), sug: 'מונים', teur: 'מחיר חשמל לקוט"ש' },
       { mafteach: 'PRICE_MAYIM',   erech: String(moneimPrices.mayim   ?? ''), sug: 'מונים', teur: 'מחיר מים לקוב' },
       { mafteach: 'PRICE_GAZ',     erech: String(moneimPrices.gaz     ?? ''), sug: 'מונים', teur: 'מחיר גז למ"ק' },
     ]
-    const { error } = await supabase.from('hagdarot')
-      .upsert(rows, { onConflict: 'mafteach' })
+    // מחיקה ואז הכנסה מחדש — הכי בטוח
+    const { error: delErr } = await supabase.from('hagdarot').delete().in('mafteach', keys)
+    if (delErr) { setPricesSaving(false); toast('שגיאה: ' + delErr.message, 'error'); return }
+    const { error } = await supabase.from('hagdarot').insert(rows)
     setPricesSaving(false)
     if (error) { toast('שגיאה: ' + error.message, 'error'); return }
     toast('מחירי מונים עודכנו ✓')
