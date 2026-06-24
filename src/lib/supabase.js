@@ -6,14 +6,12 @@ const serviceRoleKey  = import.meta.env.VITE_SUPABASE_SERVICE_ROLE
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// client עם הרשאות מלאות — לשימוש אדמין בלבד
 export const supabaseAdmin = serviceRoleKey
-  ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  ? createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
   : null
 
-// ────────────────────────────────────────────────────────────
-// עזרי תאריך
-// ────────────────────────────────────────────────────────────
 export function formatDate(dateStr) {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
@@ -21,7 +19,7 @@ export function formatDate(dateStr) {
   const day   = String(d.getDate()).padStart(2, '0')
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const year  = d.getFullYear()
-  return `${day}/${month}/${year}`
+  return day + '/' + month + '/' + year
 }
 
 export function toInputDate(dateStr) {
@@ -35,10 +33,17 @@ export function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-// ────────────────────────────────────────────────────────────
-// עזרי Storage
-// ────────────────────────────────────────────────────────────
 export async function uploadFile(bucket, path, file) {
   const { data, error } = await supabase.storage
     .from(bucket)
-    .upload(path, file, { u
+    .upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+  return urlData.publicUrl
+}
+
+export function getFileUrl(bucket, path) {
+  if (!path) return null
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+  return data.publicUrl
+}
