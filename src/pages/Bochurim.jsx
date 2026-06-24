@@ -467,4 +467,8 @@ export default function Bochurim() {
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={()=>setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
-        </d
+        </div>
+      </Modal>
+    </div>
+  )
+}
