@@ -75,6 +75,7 @@ export default function Shibutzim() {
   const [capacityInfo, setCapacityInfo] = useState(null) // תפוסה לפי חודש כשיש תאריכים
   const [calcLoading, setCalcLoading]   = useState(false)
   const [bochurFilter, setBochurFilter] = useState('all') // 'all' | 'free' | 'assigned'
+  const [dirotFilter,  setDirotFilter]  = useState('all') // 'all' | 'free' | 'future' | 'full'
   const [originalSiyum, setOriginalSiyum] = useState(null)
   const [duplicateWarning, setDuplicateWarning] = useState(null) // { address } אם הבחור כבר משובץ
 
@@ -658,10 +659,58 @@ export default function Shibutzim() {
 
           {/* דירה קודם */}
           <FormField label="דירה" required>
-            <Select value={form.dirot_id??''} onChange={e => { set('dirot_id')(e); calcSplit(e.target.value, form.id) }}>
-              <option value="">-- בחר דירה --</option>
-              {dirot.map(d=><option key={d.id} value={d.id}>{d.ktovet}{d.ir?`, ${d.ir}`:''} {d.ola_schirut_chodshi?`(${currency(d.ola_schirut_chodshi)}/ח)`:''}</option>)}
-            </Select>
+            {(() => {
+              const todayStr = new Date().toISOString().slice(0,10)
+              // תפוסה נוכחית לכל דירה (בלי השיבוץ הנוכחי שעורכים)
+              const occMap = {}
+              rows.filter(s => s.status === 'פעיל' && s.id !== form.id).forEach(s => {
+                occMap[s.dirot_id] = (occMap[s.dirot_id] ?? 0) + 1
+              })
+              // חישוב סטטוס לכל דירה
+              function getDiraStatus(d) {
+                const total = Number(d.mispar_mitot ?? 0)
+                const occ   = occMap[d.id] ?? 0
+                const free  = total - occ
+                if (free > 0) return 'free'
+                // בדוק אם יש שיבוצים שמסתיימים לפני סוף החוזה
+                const sofit = d.sofit_schirut
+                if (sofit && sofit > todayStr) {
+                  const hasEnding = rows.some(s =>
+                    s.status === 'פעיל' && s.dirot_id === d.id && s.id !== form.id &&
+                    s.taarich_siyum && s.taarich_siyum > todayStr && s.taarich_siyum < sofit
+                  )
+                  if (hasEnding) return 'future'
+                }
+                return 'full'
+              }
+              const dirotWithStatus = dirot.map(d => ({ ...d, _status: getDiraStatus(d) }))
+              const filteredDirot = dirotWithStatus.filter(d =>
+                dirotFilter === 'all' ? true : d._status === dirotFilter
+              )
+              const DOT = { free:'🟢', future:'🟡', full:'🔴' }
+              const LABELS = [['all','הכל'],['free','🟢 פנויות'],['future','🟡 מתפנות'],['full','🔴 מלאות']]
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex gap-1 flex-wrap">
+                    {LABELS.map(([v,l]) => (
+                      <button key={v} type="button"
+                        onClick={() => setDirotFilter(v)}
+                        className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${dirotFilter === v ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300'}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <Select value={form.dirot_id??''} onChange={e => { set('dirot_id')(e); calcSplit(e.target.value, form.id) }}>
+                    <option value="">-- בחר דירה --</option>
+                    {filteredDirot.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {DOT[d._status]} {d.ktovet}{d.ir?`, ${d.ir}`:''} {d.ola_schirut_chodshi?`(${currency(d.ola_schirut_chodshi)}/ח)`:''}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )
+            })()}
           </FormField>
 
           {/* תקופת חוזה הדירה */}
