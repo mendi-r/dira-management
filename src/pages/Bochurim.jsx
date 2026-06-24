@@ -77,7 +77,7 @@ export default function Bochurim() {
 
     const [data, activeShib] = await Promise.all([
       cached(cacheKey, async () => {
-        let q = supabase.from('bochurim').select('*').order('shem')
+        let q = supabase.from('bochurim').select('*').order('mishpacha').order('shem')
         if (statusFilter) q = q.eq('status', statusFilter)
         else q = q.neq('status', 'הוסר')
         const { data } = await q
