@@ -12,6 +12,7 @@ import Badge from '../components/ui/Badge'
 import { StatCard } from '../components/ui/Card'
 import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
 import { useToast } from '../components/ui/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -28,7 +29,6 @@ const EMPTY = {
 }
 const STATUS_COLORS = { שולם:'green', 'לא שולם':'red', חלקי:'yellow' }
 
-import { useAuth } from '../contexts/AuthContext'
 export default function Tashlumim() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
@@ -194,8 +194,8 @@ export default function Tashlumim() {
   })()
 
   const columns = [
-    { key:'dirot', label:'דירה', render:v => v ? `${v.ktovet??''}${v.ir?`, ${v.ir}`:''}` : '—' },
-    { key:'dirot', label:'בעלים', render:v => v?.baalim_shem ?? '—' },
+    { key:'dirot',        label:'דירה',   render:v => v ? `${v.ktovet??''}${v.ir?`, ${v.ir}`:''}` : '—' },
+    { key:'_baalim_shem', label:'בעלים',  render:(_, row) => row.dirot?.baalim_shem ?? '—' },
     { key:'chodesh', label:'חודש', render:v => formatMonth(v) },
     { key:'skhum', label:'לתשלום', render:v => currency(v) },
     { key:'skhum_shulam', label:'שולם', render:v => <span className="text-emerald-600 font-medium">{currency(v)}</span> },

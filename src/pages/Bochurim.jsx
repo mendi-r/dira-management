@@ -18,6 +18,7 @@ import DualDateField from '../components/ui/DualDateField'
 import FileUpload from '../components/ui/FileUpload'
 import AlertBanner from '../components/ui/AlertBanner'
 import { useToast } from '../components/ui/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -49,7 +50,6 @@ const TABS = [
   { key:'history',   label:'היסטוריה' },
 ]
 
-import { useAuth } from '../contexts/AuthContext'
 export default function Bochurim() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()

@@ -3,6 +3,7 @@ import { Clock, Trash2, User, Home, CreditCard, Wrench, Shuffle, FileText } from
 import { supabase } from '../lib/supabase'
 import { useRealtime } from '../hooks/useRealtime'
 import { formatDate } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 import SearchInput from '../components/ui/SearchInput'
 import { Card, CardHeader } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -21,6 +22,7 @@ const PEULA_COLORS = {
 }
 
 export default function History() {
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const [rows,    setRows]    = useState([])
   const [loading, setLoading] = useState(true)
   const [search,  setSearch]  = useState('')
@@ -45,6 +47,8 @@ export default function History() {
   }, [tableFilter, dateFrom, dateTo, page])
 
   useEffect(() => { load() }, [load])
+  // ריענון כאשר super_admin מחליף יוזר
+  useEffect(() => { if (isSuperAdmin) load() }, [viewAsOwnerId])
   // סנכרון זמן-אמת
   useRealtime('activity_log', () => { load(true) })
 

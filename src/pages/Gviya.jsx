@@ -14,6 +14,7 @@ import Badge from '../components/ui/Badge'
 import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
 import { StatCard } from '../components/ui/Card'
 import { useToast } from '../components/ui/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -30,7 +31,6 @@ const EMPTY = {
 }
 const STATUS_COLORS = { שולם:'green', 'לא שולם':'red', חלקי:'yellow' }
 
-import { useAuth } from '../contexts/AuthContext'
 export default function Gviya() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
@@ -118,13 +118,21 @@ export default function Gviya() {
   }
 
   async function deleteAll() {
+    // חובה שיהיה סינון פעיל — אסור למחוק הכל ללא סינון
+    if (!statusFilter && !monthFilter && !search) {
+      toast('יש לסנן לפני מחיקה — בחר סטטוס, חודש או חפש', 'error')
+      return
+    }
+    const toDelete = filtered.filter(r => r.status !== 'שולם')
+    if (toDelete.length === 0) { toast('אין רשומות לא שולמו למחיקה', 'error'); return }
     if (!await confirm(
-      `למחוק את כל ${rows.length} הרשומות בגבייה מבחורים?\n\nפעולה זו בלתי הפיכה לחלוטין.`,
-      { danger: true, confirmText: 'מחק הכל', cancelText: 'ביטול' }
+      `למחוק ${toDelete.length} רשומות לא שולמו?\n\nפעולה זו בלתי הפיכה.`,
+      { danger: true, confirmText: 'מחק', cancelText: 'ביטול' }
     )) return
-    const { error } = await supabase.from('gviya').delete().not('id', 'is', null)
+    const ids = toDelete.map(r => r.id)
+    const { error } = await supabase.from('gviya').delete().in('id', ids)
     if (error) { toast(error.message, 'error'); return }
-    toast('כל הרשומות נמחקו')
+    toast(`נמחקו ${ids.length} רשומות`)
     load(true)
   }
 
@@ -252,11 +260,13 @@ export default function Gviya() {
           })),'gviya.csv')}>
           ייצוא
         </Button>
-        <button onClick={deleteAll}
-          className="h-9 px-3 text-sm rounded-lg border border-red-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-400 flex items-center gap-1.5 transition-colors">
-          <Trash2 size={14}/>
-          מחק הכל
-        </button>
+        {(statusFilter || monthFilter || search) && (
+          <button onClick={deleteAll}
+            className="h-9 px-3 text-sm rounded-lg border border-red-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-400 flex items-center gap-1.5 transition-colors">
+            <Trash2 size={14}/>
+            מחק מסוננים
+          </button>
+        )}
         <Button icon={PlusCircle} onClick={openNew}>חיוב חדש</Button>
       </div>
 

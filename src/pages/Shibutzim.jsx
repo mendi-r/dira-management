@@ -12,6 +12,7 @@ import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
 import { useToast } from '../components/ui/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -56,7 +57,6 @@ function calcEndDate(startDate, months) {
   return d.toISOString().slice(0, 10)
 }
 
-import { useAuth } from '../contexts/AuthContext'
 export default function Shibutzim() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()

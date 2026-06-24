@@ -14,6 +14,7 @@ import { Tabs } from '../components/ui/Tabs'
 import { PhoneCell } from '../components/ui/ContactButtons'
 import FileUpload from '../components/ui/FileUpload'
 import { useToast } from '../components/ui/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 const EMPTY_T = {
   dirot_id:'', sug:'', teur:'', makom_bedira:'', status:'פתוח',
@@ -31,7 +32,6 @@ const TABS_T = [
   { key:'docs',    label:'מסמכים' },
 ]
 
-import { useAuth } from '../contexts/AuthContext'
 export default function Tachzuka() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()

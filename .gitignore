@@ -29,3 +29,6 @@ Thumbs.db
 
 New Text Document.txt
 .vercel
+
+# Vite dev cache
+vite.config.js.timestamp-*.mjs
