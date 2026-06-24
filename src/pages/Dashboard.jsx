@@ -6,7 +6,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, daysUntil, currency } from '../lib/utils'
-import { getCache, setCache } from '../lib/cache'
+import { getCache, setCache, clearCache } from '../lib/cache'
+import { useRealtime } from '../hooks/useRealtime'
 import { StatCard, Card, CardHeader, CardBody } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import AlertBanner from '../components/ui/AlertBanner'
@@ -137,6 +138,12 @@ export default function Dashboard() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [load])
+
+  // סנכרון זמן-אמת — כל שינוי בנתונים מרענן את לוח הבקרה
+  useRealtime(
+    ['bochurim','dirot','shibutzim','gviya','tashlumim_baalim','tachzuka'],
+    () => { clearCache(DASHBOARD_CACHE_KEY); load(true) }
+  )
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">

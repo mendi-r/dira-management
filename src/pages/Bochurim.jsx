@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { UserPlus, Edit2, Trash2, Clock, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { formatDate, toInputDate, today, daysUntil, currency, logActivity } from '../lib/utils'
 import { cached, clearCache } from '../lib/cache'
 import { confirm } from '../lib/confirm'
@@ -98,6 +99,9 @@ export default function Bochurim() {
   }, [statusFilter])
 
   useEffect(() => { load() }, [load])
+  // סנכרון זמן-אמת
+  useRealtime(['bochurim', 'shibutzim'], () => { clearCache(`bochurim_${statusFilter}`); clearCache('bochurim_'); clearCache('shibutzim_active_ids'); load(true) })
+
 
   async function loadHistory(bocherid) {
     const { data } = await supabase
@@ -463,8 +467,4 @@ export default function Bochurim() {
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={()=>setModal(false)}>ביטול</Button>
           <Button loading={saving} onClick={save}>שמור</Button>
-        </div>
-      </Modal>
-    </div>
-  )
-}
+        </d

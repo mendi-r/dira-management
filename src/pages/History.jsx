@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { Clock, Trash2, User, Home, CreditCard, Wrench, Shuffle, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { formatDate } from '../lib/utils'
 import SearchInput from '../components/ui/SearchInput'
 import { Card, CardHeader } from '../components/ui/Card'
@@ -44,6 +45,9 @@ export default function History() {
   }, [tableFilter, dateFrom, dateTo, page])
 
   useEffect(() => { load() }, [load])
+  // סנכרון זמן-אמת
+  useRealtime('activity_log', () => { load(true) })
+
 
   const filtered = rows.filter(r =>
     `${r.peula??''} ${r.shm_jadal??''} ${r.teur??''} ${r.record_id??''}`

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle, TrendingDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
 import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
@@ -69,6 +70,9 @@ export default function Tashlumim() {
   }, [statusFilter, monthFilter])
 
   useEffect(() => { load() }, [load])
+  // סנכרון זמן-אמת
+  useRealtime(['tashlumim_baalim', 'dirot'], () => { load(true) })
+
 
   const filtered = rows.filter(r => {
     const addr = `${r.dirot?.ktovet??''} ${r.dirot?.ir??''} ${r.dirot?.baalim_shem??''}`

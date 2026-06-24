@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { PlusCircle, Edit2, Trash2, Wrench, Upload, Phone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { formatDate, toInputDate, today, currency, logActivity } from '../lib/utils'
 import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
@@ -69,6 +70,9 @@ export default function Tachzuka() {
   }, [statusFilter, adifutFilter])
 
   useEffect(() => { load() }, [load] )
+  // סנכרון זמן-אמת
+  useRealtime(['tachzuka', 'vendors'], () => { load(true) })
+
 
   async function loadPritim(id) {
     const { data } = await supabase.from('tachzuka_pritim')

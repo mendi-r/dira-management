@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, TrendingUp, MessageCircle, Download, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
 import { confirm } from '../lib/confirm'
 import { WhatsAppTemplate } from '../components/ui/ContactButtons'
@@ -61,6 +62,9 @@ export default function Gviya() {
   }, [statusFilter, monthFilter])
 
   useEffect(() => { load() }, [load])
+  // סנכרון זמן-אמת
+  useRealtime(['gviya', 'bochurim'], () => { load(true) })
+
 
   const filtered = rows.filter(r => {
     const name = `${r.bochurim?.shem??''} ${r.bochurim?.mishpacha??''}`

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, MapPin, ExternalLink, Download, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { formatDate, toInputDate, calcLeaseEnd, daysUntil, currency, logActivity } from '../lib/utils'
 import { confirm } from '../lib/confirm'
 import { toHebrewDate } from '../components/ui/DualDateField'
@@ -125,6 +126,9 @@ export default function Dirot() {
   }, [statusFilter])
 
   useEffect(() => { load() }, [load])
+  // סנכרון זמן-אמת
+  useRealtime('dirot', () => { load(true) })
+
 
   async function loadHistory(dirotId) {
     const [{ data: shibs }, { data: chozimRows }] = await Promise.all([

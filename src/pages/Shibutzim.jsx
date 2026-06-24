@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, Download, RefreshCw, AlertTriangle, Bed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useRealtime } from '../hooks/useRealtime'
 import { formatDate, toInputDate, currency, logActivity } from '../lib/utils'
 import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
@@ -90,6 +91,9 @@ export default function Shibutzim() {
   }, [statusFilter])
 
   useEffect(() => { load() }, [load])
+  // סנכרון זמן-אמת
+  useRealtime(['shibutzim', 'bochurim', 'dirot'], () => { load(true) })
+
 
   // חישוב אוטומטי של חלק + מידע מיטות (לפי חודש אם יש תאריכים)
   async function calcSplit(dirotId, excludeId, startDate, endDate) {
