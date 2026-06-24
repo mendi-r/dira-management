@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle, TrendingDown, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -47,6 +47,7 @@ export default function Tashlumim() {
   const [modal, setModal]     = useState(false)
   const [form, setForm]       = useState(EMPTY)
   const [saving, setSaving]   = useState(false)
+  const suppressRealtime = useRef(0)
 
   const todayDate = new Date(); todayDate.setHours(0,0,0,0)
   function isOverdue(row) {
@@ -95,8 +96,10 @@ export default function Tashlumim() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
-  // סנכרון זמן-אמת
-  useRealtime(['tashlumim_baalim', 'dirot'], () => { load(true) })
+  useRealtime(['tashlumim_baalim', 'dirot'], () => {
+    if (Date.now() < suppressRealtime.current) return
+    load(true)
+  })
 
 
   const filtered = rows.filter(r => {
@@ -188,7 +191,7 @@ export default function Tashlumim() {
     const newSkhum    = isFullyPaid ? 0 : Number(row.skhum)
     const newStatus   = isFullyPaid ? 'לא שולם' : 'שולם'
 
-    // עדכון מקומי מיידי — שומר על מיקום השורה ומונע קפיצה
+    suppressRealtime.current = Date.now() + 3000
     setRows(prev => prev.map(r => r.id === row.id
       ? { ...r, skhum_shulam: newSkhum, status: newStatus }
       : r

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PlusCircle, Edit2, Trash2, TrendingUp, MessageCircle, Download, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -46,6 +46,7 @@ export default function Gviya() {
   const [waModal, setWaModal]   = useState(null) // row for WA template
   const [form, setForm]         = useState(EMPTY)
   const [saving, setSaving]     = useState(false)
+  const suppressRealtime = useRef(0) // ms timestamp — חסום realtime עד לזמן זה
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -65,8 +66,11 @@ export default function Gviya() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
-  // סנכרון זמן-אמת
-  useRealtime(['gviya', 'bochurim'], () => { load(true) })
+  // סנכרון זמן-אמת — מדולג 3 שניות אחרי togglePaid כדי שהסדר לא יקפוץ
+  useRealtime(['gviya', 'bochurim'], () => {
+    if (Date.now() < suppressRealtime.current) return
+    load(true)
+  })
 
 
   const filtered = rows.filter(r => {
@@ -146,11 +150,10 @@ export default function Gviya() {
     const updates = isFullyPaid
       ? { skhum_shulam: 0, status: 'לא שולם' }
       : { skhum_shulam: row.skhum, status: 'שולם' }
-    // עדכון מיידי של ה-UI — לפני תשובת השרת
+    suppressRealtime.current = Date.now() + 3000 // חסום realtime ל-3 שניות
     setRows(prev => prev.map(r => r.id === row.id ? { ...r, ...updates } : r))
     const { error } = await supabase.from('gviya').update(updates).eq('id', row.id)
     if (error) {
-      // rollback אם השרת נכשל
       setRows(prev => prev.map(r => r.id === row.id ? row : r))
       toast(error.message, 'error'); return
     }
