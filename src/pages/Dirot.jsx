@@ -155,7 +155,7 @@ export default function Dirot() {
     const warn = rows.filter(r => {
       const dc = r.sofit_schirut ? daysUntil(r.sofit_schirut) : null
       const db = r.bituach_chadush ? daysUntil(r.bituach_chadush) : null
-      return (dc !== null && dc <= 30 && dc >= 0) || (db !== null && db <= 30 && db >= 0)
+      return (dc !== null && dc <= soonDays && dc >= 0) || (db !== null && db <= soonDays && db >= 0)
     })
     setAlerts(warn)
     setLoading(false)
@@ -692,7 +692,7 @@ export default function Dirot() {
     { key:'sofit_schirut', label:'סיום חוזה', render:(v,r)=>{
       const dateEl = !v ? <span>—</span> : (() => {
         const d = daysUntil(v)
-        return <span className={d!==null&&d<=30&&d>=0?'text-amber-600 font-semibold':''}>{formatDate(v)}</span>
+        return <span className={d!==null&&d<=soonDays&&d>=0?'text-amber-600 font-semibold':''}>{formatDate(v)}</span>
       })()
       const cnt = chozimCountMap[r.id] ?? 0
       return (
@@ -774,6 +774,15 @@ export default function Dirot() {
           <option value="לא_פעיל">לא פעיל</option>
         </select>
         <button
+          onClick={() => setAlertFilter(f => f === 'contract' ? '' : 'contract')}
+          className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+            alertFilter === 'contract'
+              ? 'bg-amber-500 text-white border-amber-500'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
+          }`}>
+          🗓 מתפנות בקרוב
+        </button>
+        <button
           onClick={() => setFreeBedFilter(f => !f)}
           className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
             freeBedFilter
@@ -809,7 +818,7 @@ export default function Dirot() {
         rowClassName={row => {
           const dc = row.sofit_schirut ? daysUntil(row.sofit_schirut) : null
           const db = row.bituach_chadush ? daysUntil(row.bituach_chadush) : null
-          const isExpiring = (dc !== null && dc <= 30 && dc >= 0) || (db !== null && db <= 30 && db >= 0)
+          const isExpiring = (dc !== null && dc <= soonDays && dc >= 0) || (db !== null && db <= soonDays && db >= 0)
           return isExpiring ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50'
         }}/>
 
@@ -983,7 +992,7 @@ export default function Dirot() {
               <DualDateField value={form.bituach_chadush??''} onChange={v=>setForm(f=>({...f,bituach_chadush:v}))}/>
               {form.bituach_chadush && (() => {
                 const d = daysUntil(form.bituach_chadush)
-                if (d !== null && d <= 30 && d >= 0) return (
+                if (d !== null && d <= soonDays && d >= 0) return (
                   <p className="text-xs text-amber-600 mt-1 font-medium">חידוש בעוד {d} ימים</p>
                 )
               })()}
