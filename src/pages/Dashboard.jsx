@@ -32,6 +32,9 @@ function Clickable({ to, params = {}, children, className = '' }) {
   )
 }
 
+const SNOOZE_KEY = 'dira_alerts_snooze'
+const SNOOZE_DAYS = [1, 2, 3, 5, 7, 14]
+
 export default function Dashboard() {
   const navigate  = useNavigate()
   const { alerts } = useAlerts()
@@ -41,6 +44,24 @@ export default function Dashboard() {
   const [data, setData]       = useState(() => getCache(DASHBOARD_CACHE_KEY))
   const [loading, setLoading] = useState(() => getCache(DASHBOARD_CACHE_KEY) === null)
   const [error, setError]     = useState(null)
+
+  // snooze — מאחסן { [alertKey]: 'YYYY-MM-DD' (עד מתי לא להציג) }
+  const [snooze, setSnooze] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? '{}') } catch { return {} }
+  })
+  const [snoozeMenu, setSnoozeMenu] = useState(null) // איזה alert פתוח
+
+  function isSnoozed(key) {
+    const until = snooze[key]
+    return until && until >= new Date().toISOString().slice(0, 10)
+  }
+  function doSnooze(key, days) {
+    const d = new Date(); d.setDate(d.getDate() + days)
+    const next = { ...snooze, [key]: d.toISOString().slice(0, 10) }
+    setSnooze(next)
+    localStorage.setItem(SNOOZE_KEY, JSON.stringify(next))
+    setSnoozeMenu(null)
+  }
 
   const load = useCallback(async (force = false) => {
     // ── מטמון: אם לא force ויש נתונים טריים — הצג מיד ──
@@ -268,32 +289,47 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {alerts.length > 0 && (
-        <AlertBanner type="warning" title={`${alerts.length} התראות דורשות טיפול`}>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-xs">
-            {overdueCount > 0 && (
-              <div className="cursor-pointer hover:underline" onClick={()=>navigate('/gviya?status=לא שולם')}>
-                • {overdueCount} חיובים באיחור
-              </div>
-            )}
-            {contractEndCount > 0 && (
-              <div className="cursor-pointer hover:underline" onClick={()=>navigate('/dirot?alert=contract')}>
-                • {contractEndCount} חוזים מסתיימים תוך {soonDays} יום
-              </div>
-            )}
-            {alerts.filter(a=>a.type==='visa').length > 0 && (
-              <div className="cursor-pointer hover:underline" onClick={()=>navigate('/bochurim?alert=visa')}>
-                • {alerts.filter(a=>a.type==='visa').length} ויזות פוגות
-              </div>
-            )}
-            {alerts.filter(a=>a.type==='insurance').length > 0 && (
-              <div className="cursor-pointer hover:underline" onClick={()=>navigate('/dirot?alert=insurance')}>
-                • {alerts.filter(a=>a.type==='insurance').length} ביטוחים לחידוש
-              </div>
-            )}
-          </div>
-        </AlertBanner>
-      )}
+      {/* AlertBanner — מציג רק התראות שלא הושתקו */}
+      {(() => {
+        const visibleItems = [
+          !isSnoozed('overdue') && overdueCount > 0 && { key:'overdue', label:`${overdueCount} חיובים באיחור`, nav:'/gviya?status=לא שולם' },
+          !isSnoozed('contract') && contractEndCount > 0 && { key:'contract', label:`${contractEndCount} חוזים מסתיימים תוך ${soonDays} יום`, nav:`/dirot?alert=contract` },
+          !isSnoozed('visa') && alerts.filter(a=>a.type==='visa').length > 0 && { key:'visa', label:`${alerts.filter(a=>a.type==='visa').length} ויזות פוגות`, nav:'/bochurim?alert=visa' },
+          !isSnoozed('insurance') && alerts.filter(a=>a.type==='insurance').length > 0 && { key:'insurance', label:`${alerts.filter(a=>a.type==='insurance').length} ביטוחים לחידוש`, nav:'/dirot?alert=insurance' },
+        ].filter(Boolean)
+        if (!visibleItems.length) return null
+        return (
+          <AlertBanner type="warning" title={`${visibleItems.length} התראות דורשות טיפול`}>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1.5">
+              {visibleItems.map(item => (
+                <div key={item.key} className="relative flex items-center gap-1.5">
+                  <span className="text-sm cursor-pointer hover:underline" onClick={() => navigate(item.nav)}>
+                    • {item.label}
+                  </span>
+                  <button
+                    onClick={e => { e.stopPropagation(); setSnoozeMenu(snoozeMenu === item.key ? null : item.key) }}
+                    className="text-amber-400 hover:text-amber-700 text-xs px-1 rounded hover:bg-amber-100"
+                    title="התעלם זמנית"
+                  >✕</button>
+                  {snoozeMenu === item.key && (
+                    <div className="absolute top-full mt-1 right-0 bg-white border border-slate-200 rounded-xl shadow-lg p-2 z-50 min-w-max">
+                      <p className="text-xs text-slate-500 mb-1.5 font-medium">התעלם למשך:</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {SNOOZE_DAYS.map(d => (
+                          <button key={d} onClick={() => doSnooze(item.key, d)}
+                            className="px-2.5 py-1 text-xs rounded-lg bg-slate-100 hover:bg-amber-100 hover:text-amber-700 font-medium transition-colors">
+                            {d} ימים
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </AlertBanner>
+        )
+      })()}
 
       {/* Stats cards — all clickable */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">

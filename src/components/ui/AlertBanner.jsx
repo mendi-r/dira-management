@@ -12,11 +12,11 @@ export default function AlertBanner({ type = 'warning', title, children, onClose
   const v = variants[type]
   const Icon = v.icon
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-xl border ${v.bg} ${v.border}`}>
-      <Icon size={18} className={`${v.icon_color} flex-shrink-0 mt-0.5`} />
+    <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${v.bg} ${v.border}`}>
+      <Icon size={16} className={`${v.icon_color} flex-shrink-0`} />
       <div className="flex-1 min-w-0">
-        {title && <p className={`text-sm font-semibold ${v.text}`}>{title}</p>}
-        {children && <div className={`text-sm ${v.text} mt-0.5`}>{children}</div>}
+        {title && <p className={`text-base font-bold ${v.text} leading-tight`}>{title}</p>}
+        {children && <div className={`${v.text} mt-1`}>{children}</div>}
       </div>
       {onClose && (
         <button onClick={onClose} className={`${v.text} opacity-60 hover:opacity-100`}>
