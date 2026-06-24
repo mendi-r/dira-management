@@ -38,19 +38,43 @@ export default function FileUpload({ entityType, entityId, bucket = 'documents' 
     setLoading(false)
   }
 
+  const MAX_SIZE_MB = 10
+  const ALLOWED_TYPES = [
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ]
+
   async function handleFileUpload(e) {
     const file = e.target.files?.[0]
     if (!file || !entityId) return
+
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      toast(`הקובץ גדול מדי — מקסימום ${MAX_SIZE_MB}MB`, 'error')
+      e.target.value = ''
+      return
+    }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast('סוג קובץ לא מורשה — PDF, תמונות, Word, Excel בלבד', 'error')
+      e.target.value = ''
+      return
+    }
+    // ניקוי שם קובץ — מניעת path traversal
+    const safeName = file.name.replace(/[^a-zA-Z0-9א-ת._\- ]/g, '_').slice(0, 200)
+
     setUploading(true)
     try {
-      const path = `${entityType}/${entityId}/${Date.now()}_${file.name}`
+      const path = `${entityType}/${entityId}/${Date.now()}_${safeName}`
       const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
       if (upErr) throw upErr
       const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
       await supabase.from('documents').insert({
         entity_type: entityType,
         entity_id: entityId,
-        doc_name: file.name,
+        doc_name: safeName,
         doc_type: docType,
         file_url: urlData.publicUrl,
       })

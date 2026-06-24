@@ -9,7 +9,9 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    sourcemap: false,           // אל תייצר source maps בפרודקשן
     chunkSizeWarningLimit: 600,
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks: {
@@ -18,5 +20,9 @@ export default defineConfig({
         }
       }
     }
+  },
+  esbuild: {
+    // הסרת console.* ו-debugger מפרודקשן אוטומטית
+    drop: ['console', 'debugger'],
   }
 })

@@ -4,15 +4,15 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null }
+    this.state = { hasError: false }
   }
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error }
+  static getDerivedStateFromError() {
+    return { hasError: true }
   }
 
-  componentDidCatch(error, info) {
-    console.error('ErrorBoundary caught:', error, info)
+  componentDidCatch() {
+    // שגיאות נרשמות בשירות ניטור — לא נחשפות למשתמש
   }
 
   render() {
@@ -27,20 +27,12 @@ export default class ErrorBoundary extends React.Component {
             {this.props.message ?? 'אירעה שגיאה בטעינת הדף. שאר המערכת ממשיכה לעבוד.'}
           </p>
           <button
-            onClick={() => this.setState({ hasError: false, error: null })}
+            onClick={() => this.setState({ hasError: false })}
             className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <RefreshCw size={14} />
             נסה שוב
           </button>
-          {this.state.error && (
-            <details className="mt-4 text-left max-w-sm">
-              <summary className="text-xs text-slate-400 cursor-pointer">פרטי שגיאה</summary>
-              <pre className="text-xs text-red-600 mt-1 bg-red-50 p-2 rounded overflow-auto max-h-40">
-                {this.state.error.message}
-              </pre>
-            </details>
-          )}
         </div>
       )
     }

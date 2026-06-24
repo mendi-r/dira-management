@@ -53,8 +53,7 @@ export default function Dashboard() {
     const rpcParams = (isSuperAdmin && viewAsOwnerId) ? { p_owner_id: viewAsOwnerId } : {}
     const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats', rpcParams)
     if (rpcError || !stats) {
-      console.error('Dashboard RPC error:', rpcError)
-      setError(rpcError?.message ?? 'שגיאת RPC לא ידועה')
+      setError('שגיאה בטעינת הנתונים — אנא נסה לרענן')
       setLoading(false)
       return
     }

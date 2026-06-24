@@ -37,6 +37,24 @@ function PrivateRoute({ children }) {
   return user ? children : <Navigate to="/login" replace />
 }
 
+// רק admin + super_admin
+function AdminRoute({ children }) {
+  const { user, isAdmin, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
+  if (!isAdmin) return <Navigate to="/" replace />
+  return children
+}
+
+// רק super_admin
+function SuperAdminRoute({ children }) {
+  const { user, isSuperAdmin, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
+  if (!isSuperAdmin) return <Navigate to="/" replace />
+  return children
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   return (
@@ -51,11 +69,13 @@ function AppRoutes() {
         <Route path="tashlumim" element={<Wrap><Tashlumim /></Wrap>} />
         <Route path="tachzuka"  element={<Wrap><Tachzuka /></Wrap>} />
         <Route path="monim"     element={<Wrap><Monim /></Wrap>} />
-        <Route path="hagdarot"  element={<Wrap><Hagdarot /></Wrap>} />
-        <Route path="reports"   element={<Wrap><Reports /></Wrap>} />
         <Route path="calendar"  element={<Wrap><CalendarPage /></Wrap>} />
-        <Route path="history"   element={<Wrap><History /></Wrap>} />
-        <Route path="users"     element={<Wrap><UserManagement /></Wrap>} />
+        {/* admin בלבד */}
+        <Route path="hagdarot"  element={<AdminRoute><Wrap><Hagdarot /></Wrap></AdminRoute>} />
+        <Route path="reports"   element={<AdminRoute><Wrap><Reports /></Wrap></AdminRoute>} />
+        <Route path="history"   element={<AdminRoute><Wrap><History /></Wrap></AdminRoute>} />
+        {/* super_admin בלבד */}
+        <Route path="users"     element={<SuperAdminRoute><Wrap><UserManagement /></Wrap></SuperAdminRoute>} />
       </Route>
     </Routes>
   )

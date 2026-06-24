@@ -66,7 +66,6 @@ export default function Tachzuka() {
       supabase.from('dirot').select('id,ktovet,ir').order('ktovet'),
       supabase.from('vendors').select('*').order('shem'),
     ])
-    if (tErr) console.error('tachzuka load error:', tErr)
     setRows(t ?? []); setDirot(d ?? []); setVendors(v ?? [])
     setLoading(false)
   }, [statusFilter, adifutFilter])
