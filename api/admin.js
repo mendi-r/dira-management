@@ -20,16 +20,22 @@ export default async function handler(req, res) {
   const token = (req.headers.authorization || '').replace('Bearer ', '')
   if (!token) { res.status(401).json({ error: 'Unauthorized' }); return }
 
-  const anonClient = createClient(supabaseUrl, anonKey)
-  const { data: { user }, error: authErr } = await anonClient.auth.getUser(token)
+  const adminClient = getAdminClient()
+
+  // Verify token and get user
+  const { data: { user }, error: authErr } = await adminClient.auth.getUser(token)
   if (authErr || !user) { res.status(401).json({ error: 'Invalid token' }); return }
 
-  const { data: roleRow } = await anonClient
+  // Check role using admin client (bypasses RLS)
+  const { data: roleRow } = await adminClient
     .from('users_roles').select('role').eq('user_id', user.id).single()
-  if (roleRow?.role !== 'super_admin') { res.status(403).json({ error: 'Forbidden' }); return }
+
+  const role = roleRow?.role
+  if (role !== 'super_admin' && role !== 'admin') {
+    res.status(403).json({ error: 'Forbidden - admins only' }); return
+  }
 
   const { action, email, password, userId, ban } = req.body
-  const adminClient = getAdminClient()
 
   try {
     if (action === 'createUser') {
