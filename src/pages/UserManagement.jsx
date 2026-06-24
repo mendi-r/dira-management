@@ -85,7 +85,7 @@ export default function UserManagement() {
     try {
       const { user: newUser } = await adminApi('createUser', { email: form.email.trim(), password: form.password })
       await supabase.from('users_roles').upsert(
-        { user_id: newUser.id, role: form.role },
+        { user_id: newUser.id, role: form.role, parent_id: user.id },
         { onConflict: 'user_id' }
       )
       toast('משתמש נוצר בהצלחה ✓')
