@@ -74,6 +74,7 @@ export default function Shibutzim() {
   const [bedInfo, setBedInfo]           = useState(null)
   const [capacityInfo, setCapacityInfo] = useState(null) // תפוסה לפי חודש כשיש תאריכים
   const [calcLoading, setCalcLoading]   = useState(false)
+  const [bochurFilter, setBochurFilter] = useState('all') // 'all' | 'free' | 'assigned'
   const [originalSiyum, setOriginalSiyum] = useState(null)
   const [duplicateWarning, setDuplicateWarning] = useState(null) // { address } אם הבחור כבר משובץ
 
@@ -85,7 +86,7 @@ export default function Shibutzim() {
     if (statusFilter) q = q.eq('status', statusFilter)
     const [{ data:s },{ data:b },{ data:d }] = await Promise.all([
       q,
-      supabase.from('bochurim').select('id,shem,mishpacha').order('shem'),
+      supabase.from('bochurim').select('id,shem,mishpacha').order('mishpacha').order('shem'),
       supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi,mispar_mitot,payment_day,tchilat_schirut,sofit_schirut').order('ktovet'),
     ])
     setRows(s??[]); setBochurim(b??[]); setDirot(d??[])
@@ -131,9 +132,25 @@ export default function Shibutzim() {
       setCapacityInfo({ total: totalMitot, months: monthData, hasFullMonth: monthData.some(m => m.full) })
       setBedInfo(null)
     } else {
-      // מצב ללא תאריכים: הצג תפוסה נוכחית פשוטה
-      const occupied = (allShibs ?? []).filter(s => s.status === 'פעיל').length
-      setBedInfo({ total: totalMitot, occupied, free: Math.max(0, totalMitot - occupied) })
+      // מצב ללא תאריכים: הצג תפוסה נוכחית + חלונות זמינות עתידיים
+      const activeShib = (allShibs ?? []).filter(s => s.status === 'פעיל')
+      const occupied = activeShib.length
+      const sofit = dira.sofit_schirut
+      const todayStr = new Date().toISOString().slice(0, 10)
+      const windows = []
+      if (sofit && sofit > todayStr && occupied >= totalMitot) {
+        function dayAfter(ds) { const d = new Date(ds + 'T12:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10) }
+        const endingShib = activeShib
+          .filter(s => s.taarich_siyum && s.taarich_siyum < sofit)
+          .sort((a,b) => a.taarich_siyum.localeCompare(b.taarich_siyum))
+        const uniqueEnds = [...new Set(endingShib.map(s => s.taarich_siyum))]
+        uniqueEnds.forEach(endDate => {
+          const stillActive = activeShib.filter(sh => !sh.taarich_siyum || sh.taarich_siyum > endDate).length
+          const free = totalMitot - stillActive
+          if (free > 0) windows.push({ fromDate: dayAfter(endDate), freeBeds: free })
+        })
+      }
+      setBedInfo({ total: totalMitot, occupied, free: Math.max(0, totalMitot - occupied), windows })
       setCapacityInfo(null)
     }
 
@@ -719,14 +736,48 @@ export default function Shibutzim() {
               </span>
               {bedInfo.free <= 0 && <AlertTriangle size={13} className="text-red-500"/>}
             </div>
-          ) : <div/>}
+          ) : null}
+          {bedInfo && bedInfo.free <= 0 && bedInfo.windows?.length > 0 && (
+            <div className="flex flex-col gap-1 px-3 py-2 rounded-xl border border-blue-200 bg-blue-50 text-xs self-end mb-0.5">
+              <span className="font-semibold text-blue-700 mb-0.5">🗓 מתפנות בקרוב:</span>
+              {bedInfo.windows.map((w, i) => (
+                <span key={i} className="text-blue-600">
+                  מ-{formatDate(w.fromDate)} — {w.freeBeds} מיט{w.freeBeds === 1 ? 'ה' : 'ות'} פנוי{w.freeBeds === 1 ? 'ה' : 'ות'}
+                </span>
+              ))}
+            </div>
+          )}
+          {!bedInfo && !capacityInfo && <div/>}
 
           {/* בחור */}
           <FormField label="בחור" required>
-            <Select value={form.bochurim_id??''} onChange={onBochurChange}>
-              <option value="">-- בחר בחור --</option>
-              {bochurim.map(b=><option key={b.id} value={b.id}>{b.shem} {b.mishpacha}</option>)}
-            </Select>
+            {(() => {
+              const assignedIds = new Set(rows.filter(s => s.status === 'פעיל' && s.id !== form.id).map(s => s.bochurim_id))
+              const filteredB = bochurim.filter(b =>
+                bochurFilter === 'free'     ? !assignedIds.has(b.id) :
+                bochurFilter === 'assigned' ?  assignedIds.has(b.id) : true
+              )
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex gap-1">
+                    {[['all','הכל'],['free','🟢 פנויים'],['assigned','🔴 משובצים']].map(([v,l]) => (
+                      <button key={v} type="button"
+                        onClick={() => setBochurFilter(v)}
+                        className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${bochurFilter === v ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300'}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <Select value={form.bochurim_id??''} onChange={onBochurChange}>
+                    <option value="">-- בחר בחור --</option>
+                    {filteredB.map(b => {
+                      const assigned = assignedIds.has(b.id)
+                      return <option key={b.id} value={b.id}>{assigned ? '🔴' : '🟢'} {b.mishpacha} {b.shem}</option>
+                    })}
+                  </Select>
+                </div>
+              )
+            })()}
           </FormField>
 
           {/* אזהרת שיבוץ כפול */}

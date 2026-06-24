@@ -57,7 +57,7 @@ export default function Gviya() {
     if (monthFilter)  q = q.eq('chodesh', monthFilter)
     const [{ data:g },{ data:b },{ data:d }] = await Promise.all([
       q,
-      supabase.from('bochurim').select('id,shem,mishpacha,telefon,amla_chodshit').order('shem'),
+      supabase.from('bochurim').select('id,shem,mishpacha,telefon,amla_chodshit').order('mishpacha').order('shem'),
       supabase.from('dirot').select('id,ktovet,ir').order('ktovet'),
     ])
     setRows(g??[]); setBochurim(b??[]); setDirot(d??[])
@@ -292,7 +292,7 @@ export default function Gviya() {
           <FormField label="בחור" required>
             <Select value={form.bochurim_id??''} onChange={set('bochurim_id')}>
               <option value="">-- בחר בחור --</option>
-              {bochurim.map(b=><option key={b.id} value={b.id}>{b.shem} {b.mishpacha}</option>)}
+              {bochurim.map(b=><option key={b.id} value={b.id}>{b.mishpacha} {b.shem}</option>)}
             </Select>
           </FormField>
           <FormField label="דירה">
