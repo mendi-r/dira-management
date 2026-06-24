@@ -27,10 +27,11 @@ async function adminApi(action, params = {}) {
 }
 
 const ROLES = [
-  { value: 'admin',       label: 'מנהל מערכת',  color: 'teal',  desc: 'גישה מלאה לכל המסכים + ניהול משתמשים' },
-  { value: 'accountant',  label: 'רואה חשבון',   color: 'blue',  desc: 'גבייה, דוחות כספיים' },
-  { value: 'maintenance', label: 'אחראי תחזוקה', color: 'amber', desc: 'תחזוקה וקריאות מונים' },
-  { value: 'viewer',      label: 'צפייה בלבד',   color: 'gray',  desc: 'קריאה בלבד' },
+  { value: 'super_admin',  label: 'מנהל ראשי',    color: 'purple', desc: 'גישה מלאה + ניהול משתמשים' },
+  { value: 'admin',        label: 'מנהל מערכת',   color: 'teal',   desc: 'גישה מלאה לכל המסכים' },
+  { value: 'accountant',   label: 'רואה חשבון',   color: 'blue',   desc: 'גבייה, דוחות כספיים' },
+  { value: 'maintenance',  label: 'אחראי תחזוקה', color: 'amber',  desc: 'תחזוקה וקריאות מונים' },
+  { value: 'viewer',       label: 'צפייה בלבד',   color: 'gray',   desc: 'קריאה בלבד' },
 ]
 
 const EMPTY = { email: '', password: '', role: 'viewer' }
@@ -46,7 +47,7 @@ function isBanned(u) {
 
 export default function UserManagement() {
   const toast = useToast()
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, isSuperAdmin } = useAuth()
   const [users,       setUsers]       = useState([])
   const [loading,     setLoading]     = useState(true)
   const [createModal, setCreateModal] = useState(false)
@@ -136,7 +137,7 @@ export default function UserManagement() {
     toast('מייל איפוס נשלח ✓')
   }
 
-  if (!isAdmin) {
+  if (!isSuperAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-slate-400">
         <Shield size={48} className="opacity-20 mb-4"/>
@@ -157,7 +158,7 @@ export default function UserManagement() {
             <div>
               <p className="font-semibold text-slate-800">{user?.email}</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <Badge color="teal">{'מנהל מערכת'}</Badge>
+                <Badge color={isSuperAdmin ? 'purple' : 'teal'}>{isSuperAdmin ? 'מנהל ראשי' : 'מנהל מערכת'}</Badge>
                 <span className="text-xs text-slate-400">{user?.id?.slice(0, 8)}...</span>
               </div>
             </div>

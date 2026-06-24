@@ -20,14 +20,18 @@ const ALL_LINKS = [
   { to: '/reports',    label: '\u05d3\u05d5\u05d7\u05d5\u05ea \u05db\u05e1\u05e4\u05d9\u05d9\u05dd',   icon: BarChart2 },
   { to: '/calendar',   label: '\u05dc\u05d5\u05d7 \u05e9\u05e0\u05d4',        icon: CalendarDays },
   { to: '/history',    label: '\u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4',       icon: History },
-  { to: '/users',      label: '\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd',        icon: ShieldCheck, adminOnly: true },
+  { to: '/users',      label: '\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd',        icon: ShieldCheck, superAdminOnly: true },
   { divider: true },
   { to: '/hagdarot',   label: '\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea',         icon: Settings },
 ]
 
 export default function Sidebar({ open, setOpen }) {
-  const { isAdmin } = useAuth()
-  const links = ALL_LINKS.filter(l => !l.adminOnly || isAdmin)
+  const { isAdmin, isSuperAdmin } = useAuth()
+  const links = ALL_LINKS.filter(l => {
+    if (l.superAdminOnly) return isSuperAdmin
+    if (l.adminOnly) return isAdmin
+    return true
+  })
 
   return (
     <>
