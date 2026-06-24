@@ -38,6 +38,7 @@ export default function Dashboard() {
   // אתחול ישיר מהמטמון — אם קיים, הרנדר הראשון כבר מציג תוכן ללא ספינר
   const [data, setData]       = useState(() => getCache(DASHBOARD_CACHE_KEY))
   const [loading, setLoading] = useState(() => getCache(DASHBOARD_CACHE_KEY) === null)
+  const [error, setError]     = useState(null)
 
   const load = useCallback(async (force = false) => {
     // ── מטמון: אם לא force ויש נתונים טריים — הצג מיד ──
@@ -53,9 +54,11 @@ export default function Dashboard() {
     const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats', rpcParams)
     if (rpcError || !stats) {
       console.error('Dashboard RPC error:', rpcError)
+      setError(rpcError?.message ?? 'שגיאת RPC לא ידועה')
       setLoading(false)
       return
     }
+    setError(null)
 
     // שיוך תוצאות ה-RPC למשתנים זהים לקוד הקיים
     const bochurimCount  = stats.bochurim_count  ?? 0
@@ -132,7 +135,7 @@ export default function Dashboard() {
     setCache(DASHBOARD_CACHE_KEY, result, DASHBOARD_TTL)
     setData(result)
     setLoading(false)
-  }, [])
+  }, [isSuperAdmin, viewAsOwnerId])
 
   useEffect(() => { clearCache(DASHBOARD_CACHE_KEY); load(true) }, [viewAsOwnerId])
 
@@ -157,7 +160,11 @@ export default function Dashboard() {
   )
 
   if (!data) return (
-    <div className="flex items-center justify-center py-24 text-gray-500">שגיאה בטעינת הנתונים — נסה לרענן</div>
+    <div className="flex flex-col items-center justify-center py-24 text-gray-500 gap-2">
+      <p className="font-medium">שגיאה בטעינת הנתונים — נסה לרענן</p>
+      {error && <p className="text-xs text-red-500 max-w-md text-center">{error}</p>}
+      <button onClick={() => load(true)} className="mt-2 text-sm text-teal-600 underline">רענן</button>
+    </div>
   )
 
   const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds, freeApartments,
