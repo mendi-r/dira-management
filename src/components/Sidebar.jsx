@@ -5,8 +5,9 @@ import {
   Wrench, Gauge, Settings, ChevronRight, Building2,
   BarChart2, CalendarDays, History, ShieldCheck, Banknote
 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
-const links = [
+const ALL_LINKS = [
   { to: '/',            label: 'לוח בקרה',       icon: LayoutDashboard, end: true },
   { to: '/bochurim',    label: 'בחורים',          icon: Users },
   { to: '/dirot',       label: 'דירות',           icon: Home },
@@ -19,12 +20,14 @@ const links = [
   { to: '/reports',    label: 'דוחות כספיים', icon: BarChart2 },
   { to: '/calendar',   label: 'לוח שנה',      icon: CalendarDays },
   { to: '/history',    label: 'היסטוריה',     icon: History },
-  { to: '/users',      label: 'משתמשים',      icon: ShieldCheck },
+  { to: '/users',      label: 'משתמשים',      icon: ShieldCheck, adminOnly: true },
   { divider: true },
   { to: '/hagdarot',   label: 'הגדרות',       icon: Settings },
 ]
 
 export default function Sidebar({ open, setOpen }) {
+  const { isAdmin } = useAuth()
+  const links = ALL_LINKS.filter(l => !l.adminOnly || isAdmin)
   return (
     <>
       {/* Overlay on mobile */}
@@ -93,11 +96,4 @@ export default function Sidebar({ open, setOpen }) {
           className="hidden lg:flex items-center justify-center h-10 border-t border-teal-700 text-teal-300 hover:text-white transition-colors"
         >
           <ChevronRight
-            size={18}
-            className={`transition-transform duration-300 ${open ? 'rotate-0' : 'rotate-180'}`}
-          />
-        </button>
-      </aside>
-    </>
-  )
-}
+            

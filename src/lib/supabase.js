@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const serviceRoleKey  = import.meta.env.VITE_SUPABASE_SERVICE_ROLE
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// client עם הרשאות מלאות — לשימוש אדמין בלבד
+export const supabaseAdmin = serviceRoleKey
+  ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  : null
 
 // ────────────────────────────────────────────────────────────
 // עזרי תאריך
@@ -35,14 +41,4 @@ export function today() {
 export async function uploadFile(bucket, path, file) {
   const { data, error } = await supabase.storage
     .from(bucket)
-    .upload(path, file, { upsert: true })
-  if (error) throw error
-  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
-  return urlData.publicUrl
-}
-
-export function getFileUrl(bucket, path) {
-  if (!path) return null
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
-  return data.publicUrl
-}
+    .upload(path, file, { u
