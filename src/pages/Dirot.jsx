@@ -1068,4 +1068,45 @@ export default function Dirot() {
       <Modal open={renewModal} onClose={()=>setRenewModal(false)} title={`חידוש חוזה — ${form.ktovet ?? ''}`} size="sm">
         <div className="space-y-4">
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
-            חוזה נוכחי: <strong>{formatDate(form.tchilat_schirut)}</stro
+            חוזה נוכחי: <strong>{formatDate(form.tchilat_schirut)}</strong> עד <strong>{formatDate(form.sofit_schirut)}</strong>
+          </div>
+          <FormField label="תאריך תחילה חדש" required>
+            <Input type="date" value={renewForm.tchilat_schirut}
+              min={form.sofit_schirut || undefined}
+              onChange={e => {
+                const val = e.target.value
+                const newEnd = calcLeaseEnd(val, renewForm.mispar_chodashim)
+                setRenewForm(f => ({ ...f, tchilat_schirut: val, _sofit: newEnd }))
+              }}/>
+          </FormField>
+          <FormField label="מספר חודשים" required>
+            <Input type="number" min="1" value={renewForm.mispar_chodashim}
+              onChange={e => {
+                const val = e.target.value
+                const newEnd = calcLeaseEnd(renewForm.tchilat_schirut, val)
+                setRenewForm(f => ({ ...f, mispar_chodashim: val, _sofit: newEnd }))
+              }} placeholder="12"/>
+            {renewForm._sofit && (
+              <p className="text-xs text-teal-600 mt-1 px-1">סיום: {formatDate(renewForm._sofit)}</p>
+            )}
+          </FormField>
+          <FormField label="עלות שכירות חודשית (₪)" required>
+            <Input type="number" min="0" value={renewForm.ola_schirut_chodshi}
+              onChange={e => setRenewForm(f => ({ ...f, ola_schirut_chodshi: e.target.value }))}/>
+          </FormField>
+          <FormField label="הערות חוזה">
+            <Textarea value={renewForm.hearot_chozeh??''} onChange={e => setRenewForm(f => ({ ...f, hearot_chozeh: e.target.value }))} rows={2} placeholder="הערות לחוזה החדש..."/>
+          </FormField>
+          <p className="text-xs text-slate-500">
+            ✓ יווצרו שורות תשלום לבעלים לתקופה החדשה<br/>
+            ✓ ההיסטוריה של החוזה הנוכחי תישמר בתנו</p>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="secondary" onClick={() => setRenewModal(false)}>ביטול</Button>
+            <Button loading={renewSaving} onClick={renewContract}>חדש חוזה</Button>
+          </div>
+        </div>
+      </Modal>
+
+      </div>
+  )
+}
