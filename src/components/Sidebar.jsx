@@ -52,8 +52,8 @@ export default function Sidebar({ open, setOpen }) {
           </div>
           {open && (
             <div>
-              <p className="font-bold text-sm leading-tight">\u05e0\u05d9\u05d4\u05d5\u05dc \u05d3\u05d9\u05e8\u05d5\u05ea</p>
-              <p className="text-teal-300 text-xs">\u05d5\u05d1\u05d7\u05d5\u05e8\u05d9\u05dd</p>
+              <p className="font-bold text-sm leading-tight">{'\u05e0\u05d9\u05d4\u05d5\u05dc \u05d3\u05d9\u05e8\u05d5\u05ea'}</p>
+              <p className="text-teal-300 text-xs">{'\u05d5\u05d1\u05d7\u05d5\u05e8\u05d9\u05dd'}</p>
             </div>
           )}
         </div>
