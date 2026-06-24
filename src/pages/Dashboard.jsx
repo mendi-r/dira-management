@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Home, Shuffle, CreditCard, Wrench,
-  TrendingUp, TrendingDown, DollarSign, Bed, Banknote, RefreshCw
+  TrendingUp, TrendingDown, DollarSign, Bed, Banknote, RefreshCw, CalendarClock
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate, daysUntil, currency } from '../lib/utils'
@@ -119,6 +119,20 @@ export default function Dashboard() {
     const overdueCount     = gviyaOpen.filter(g => g.taarich && new Date(g.taarich) < new Date()).length
     const contractEndCount = dirot.filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
 
+    // ── מיטות שמתפנות בעתיד — לפי taarich_sium בשיבוצים פעילים ──
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const dirotById = Object.fromEntries(dirot.map(d => [d.id, d]))
+    const futureShibutzim = shibutzim
+      .filter(s => s.taarich_sium && s.taarich_sium > todayStr)
+      .sort((a, b) => a.taarich_sium.localeCompare(b.taarich_sium))
+    // קיבוץ לפי חודש YYYY-MM
+    const futureByMonth = {}
+    futureShibutzim.forEach(s => {
+      const m = s.taarich_sium.slice(0, 7)
+      if (!futureByMonth[m]) futureByMonth[m] = []
+      futureByMonth[m].push({ dirot_id: s.dirot_id, taarich_sium: s.taarich_sium })
+    })
+
     const result = {
       bochurimCount, dirotCount, shibutzimCount: shibutzim.length,
       totalBeds, occupiedBeds, freeBeds, freeApartments,
@@ -130,6 +144,7 @@ export default function Dashboard() {
       overdueCount, contractEndCount,
       currentMonth,
       utilTypes, utilityTotal, dirotWithReadings,
+      dirotById, futureByMonth,
     }
     setCache(DASHBOARD_CACHE_KEY, result, DASHBOARD_TTL)
     setData(result)
@@ -170,7 +185,11 @@ export default function Dashboard() {
           unassigned, gviyaTotal, gviyaCollected, gviyaOutstanding,
           tashlumimTotal, netProfit, dirotStats, openDebts,
           tachzukaOpen, overdueCount, contractEndCount, currentMonth,
-          utilTypes, utilityTotal, dirotWithReadings } = data
+          utilTypes, utilityTotal, dirotWithReadings,
+          dirotById = {}, futureByMonth = {} } = data
+
+  const futureMonths = Object.keys(futureByMonth).sort()
+  const totalFutureBeds = Object.values(futureByMonth).reduce((s, arr) => s + arr.length, 0)
 
   return (
     <div className="space-y-6 fade-in">
@@ -229,7 +248,11 @@ export default function Dashboard() {
         </Clickable>
         <Clickable to="/dirot" params={{ free_beds:'true' }}>
           <StatCard label="דירות פנויות" value={freeApartments} icon={Bed} color="teal"
-            sub={`${freeBeds} מיטות פנויות`}/>
+            sub={freeBeds > 0
+              ? `${freeBeds} פנויות כעת`
+              : totalFutureBeds > 0
+                ? `${totalFutureBeds} מתפנות בקרוב`
+                : 'כל המיטות תפוסות'}/>
         </Clickable>
       </div>
 
@@ -318,10 +341,11 @@ export default function Dashboard() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Beds — clickable sections */}
+        {/* Beds — current + future timeline */}
         <Card>
           <CardHeader title="סיכום מיטות" action={<Bed size={18} className="text-slate-400"/>}/>
           <CardBody>
+            {/* מצב נוכחי */}
             <div className="flex items-center gap-4">
               <div className="flex-1 text-center">
                 <p className="text-3xl font-bold text-slate-800">{totalBeds}</p>
@@ -331,9 +355,9 @@ export default function Dashboard() {
                 <p className="text-3xl font-bold text-teal-600 group-hover:text-teal-800">{occupiedBeds}</p>
                 <p className="text-xs text-slate-400 mt-0.5 group-hover:underline">תפוסות</p>
               </Clickable>
-              <Clickable to="/dirot" params={{ status_calc:'פנוי' }} className="flex-1 text-center group">
-                <p className="text-3xl font-bold text-emerald-500 group-hover:text-emerald-700">{freeBeds}</p>
-                <p className="text-xs text-slate-400 mt-0.5 group-hover:underline">פנויות</p>
+              <Clickable to="/dirot" params={{ free_beds:'true' }} className="flex-1 text-center group">
+                <p className={`text-3xl font-bold group-hover:opacity-80 ${freeBeds > 0 ? 'text-emerald-500' : 'text-slate-300'}`}>{freeBeds}</p>
+                <p className="text-xs text-slate-400 mt-0.5 group-hover:underline">פנויות כעת</p>
               </Clickable>
             </div>
             {totalBeds > 0 && (
@@ -344,6 +368,40 @@ export default function Dashboard() {
                 </div>
                 <p className="text-xs text-slate-400 mt-1 text-left">{Math.round(occupiedBeds/totalBeds*100)}% תפוסה</p>
               </div>
+            )}
+
+            {/* ציר זמן עתידי */}
+            {futureMonths.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <CalendarClock size={13} className="text-blue-400"/>
+                  <p className="text-xs font-semibold text-slate-500">מתפנות לפי חודש ({totalFutureBeds} מיטות)</p>
+                </div>
+                <div className="space-y-1">
+                  {futureMonths.map(month => {
+                    const beds = futureByMonth[month]
+                    // כתובות ייחודיות לאותו חודש
+                    const addrs = [...new Set(beds.map(s => dirotById[s.dirot_id]?.ktovet).filter(Boolean))]
+                    const [y, m] = month.split('-')
+                    const label = new Date(Number(y), Number(m) - 1, 1)
+                      .toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })
+                    return (
+                      <Clickable key={month} to="/shibutzim" params={{ status:'פעיל' }}>
+                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-blue-50 cursor-pointer group transition-colors">
+                          <span className="text-xs font-semibold text-blue-700 w-28 shrink-0 group-hover:underline">{label}</span>
+                          <span className="text-xs font-bold text-emerald-600">{beds.length} מיטות</span>
+                          <span className="text-xs text-slate-400 truncate flex-1">
+                            {addrs.slice(0, 2).join(' • ')}{addrs.length > 2 ? ` +${addrs.length - 2}` : ''}
+                          </span>
+                        </div>
+                      </Clickable>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            {futureMonths.length === 0 && occupiedBeds > 0 && (
+              <p className="text-xs text-slate-400 mt-3 text-center">⚠️ לא הוגדרו תאריכי סיום לשיבוצים</p>
             )}
           </CardBody>
         </Card>
