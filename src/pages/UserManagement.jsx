@@ -80,7 +80,7 @@ export default function UserManagement() {
 
   async function createUser() {
     if (!form.email.trim()) { toast('יש להזין אימייל', 'error'); return }
-    if (form.password.length < 6) { toast('סיסמא חייבת להיות לפחות 6 תווים', 'error'); return }
+    if (form.password.length < 8) { toast('סיסמא חייבת להיות לפחות 8 תווים', 'error'); return }
     setSaving(true)
     try {
       const { user: newUser } = await adminApi('createUser', { email: form.email.trim(), password: form.password })
@@ -282,7 +282,7 @@ export default function UserManagement() {
                 type={showPw ? 'text' : 'password'}
                 value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                placeholder="לפחות 6 תווים"
+                placeholder="לפחות 8 תווים"
               />
               <button type="button" onClick={() => setShowPw(p => !p)}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
