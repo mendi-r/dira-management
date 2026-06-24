@@ -61,10 +61,11 @@ export default function Dashboard() {
 
     // שיוך תוצאות ה-RPC למשתנים זהים לקוד הקיים
     const bochurimCount  = stats.bochurim_count  ?? 0
-    const dirotCount     = stats.dirot_count     ?? 0
     const currentMonth   = stats.current_month
     const shibutzim      = stats.shibutzim       ?? []
-    const dirot          = stats.dirot           ?? []
+    // סנן רק דירות פעילות
+    const dirot          = (stats.dirot ?? []).filter(d => d.status === 'פעיל')
+    const dirotCount     = dirot.length
     const allBochurim    = stats.active_bochurim ?? []
     const gviyaOpen      = stats.gviya_open      ?? []
     const tachzukaOpen   = stats.tachzuka_open   ?? []
@@ -419,7 +420,7 @@ export default function Dashboard() {
                   <CalendarClock size={13} className="text-blue-400"/>
                   <p className="text-xs font-semibold text-slate-500">זמינות מיטות לפי דירה</p>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                   {availabilityWindows.map(w => (
                     <Clickable key={w.dirot_id} to="/shibutzim" params={{ status:'פעיל' }}>
                       <div className="p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer">

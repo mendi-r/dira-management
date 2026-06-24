@@ -60,7 +60,13 @@ export default function Gviya() {
       supabase.from('bochurim').select('id,shem,mishpacha,telefon,amla_chodshit').eq('status','פעיל').order('mishpacha').order('shem'),
       supabase.from('dirot').select('id,ktovet,ir').order('ktovet'),
     ])
-    setRows(g??[]); setBochurim(b??[]); setDirot(d??[])
+    const sorted = (g ?? []).sort((a, b) => {
+      const mA = a.bochurim?.mishpacha ?? '', mB = b.bochurim?.mishpacha ?? ''
+      const sA = a.bochurim?.shem ?? '',     sB = b.bochurim?.shem ?? ''
+      const tA = a.taarich ?? '',            tB = b.taarich ?? ''
+      return mA.localeCompare(mB, 'he') || sA.localeCompare(sB, 'he') || tA.localeCompare(tB)
+    })
+    setRows(sorted); setBochurim(b??[]); setDirot(d??[])
     setLoading(false)
   }, [statusFilter, monthFilter])
 
