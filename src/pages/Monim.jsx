@@ -76,7 +76,7 @@ export default function Monim() {
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [sugFilter, setSugFilter]       = useState(searchParams.get('sug') ?? sessionStorage.getItem('monim_sug') ?? '')
-  const [dirotFilter, setDirotFilter]   = useState(sessionStorage.getItem('monim_dira') ?? '')
+  const [dirotFilter, setDirotFilter]   = useState(searchParams.get('dirot_id') ?? sessionStorage.getItem('monim_dira') ?? '')
   const [shulamFilter, setShulamFilter] = useState(sessionStorage.getItem('monim_shulam') ?? '')
   const [modal, setModal]             = useState(false)
   const [form, setForm]               = useState(EMPTY)

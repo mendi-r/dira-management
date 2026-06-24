@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle, TrendingDown } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { PlusCircle, Edit2, Trash2, RefreshCw, Download, CheckCircle, AlertTriangle, TrendingDown, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useRealtime } from '../hooks/useRealtime'
 import { formatDate, formatMonth, toInputDate, today, currency, logActivity } from '../lib/utils'
@@ -13,6 +14,8 @@ import { StatCard } from '../components/ui/Card'
 import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
 import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../contexts/AuthContext'
+
+const UTIL_EMOJI = { חשמל: '⚡', מים: '💧', גז: '🔥' }
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -32,8 +35,10 @@ const STATUS_COLORS = { שולם:'green', 'לא שולם':'red', חלקי:'yello
 export default function Tashlumim() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
+  const navigate = useNavigate()
   const [rows, setRows]       = useState([])
   const [dirot, setDirot]     = useState([])
+  const [monimMap, setMonimMap] = useState({}) // dirot_id → [sug_mone, ...]
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -50,13 +55,20 @@ export default function Tashlumim() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
+    const thisMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
     let q = supabase.from('tashlumim_baalim')
       .select('*, dirot(ktovet,ir,baalim_shem,baalim_telefon1)')
     if (statusFilter) q = q.eq('status', statusFilter)
     if (monthFilter)  q = q.eq('chodesh', monthFilter)
-    const [{ data: t }, { data: d }] = await Promise.all([
+    const [{ data: t }, { data: d }, { data: riut }] = await Promise.all([
       q,
       supabase.from('dirot').select('id,ktovet,ir,baalim_shem,ola_schirut_chodshi,payment_day').order('ktovet'),
+      // קריאות מונה לחודש הנוכחי בלבד
+      supabase.from('riut')
+        .select('dirot_id,sug_mone,skhum_leshalem,id')
+        .gte('taarich_kriah', thisMonth + '-01')
+        .lte('taarich_kriah', thisMonth + '-31')
+        .eq('is_kriah_ptika', false),
     ])
     // מיון יציב: לפי כתובת דירה, אחר כך לפי חודש
     const sorted = (t ?? []).slice().sort((a, b) => {
@@ -68,6 +80,13 @@ export default function Tashlumim() {
     })
     setRows(sorted)
     setDirot(d ?? [])
+    // בניית מפה: dirot_id → [{sug_mone, skhum_leshalem, id}]
+    const map = {}
+    ;(riut ?? []).forEach(r => {
+      if (!map[r.dirot_id]) map[r.dirot_id] = []
+      map[r.dirot_id].push(r)
+    })
+    setMonimMap(map)
     setLoading(false)
   }, [statusFilter, monthFilter])
 
@@ -198,6 +217,8 @@ export default function Tashlumim() {
     return d.toISOString().slice(0, 7)
   })()
 
+  const thisMonth = new Date().toISOString().slice(0, 7)
+
   const columns = [
     { key:'dirot',        label:'דירה',   render:v => v ? `${v.ktovet??''}${v.ir?`, ${v.ir}`:''}` : '—' },
     { key:'_baalim_shem', label:'בעלים',  render:(_, row) => row.dirot?.baalim_shem ?? '—' },
@@ -212,6 +233,34 @@ export default function Tashlumim() {
     }},
     { key:'taarich', label:'תאריך', render:v => formatDate(v) },
     { key:'status', label:'סטטוס', render:v => <Badge color={STATUS_COLORS[v]??'gray'}>{v??'—'}</Badge> },
+    { key:'_monim', label:'שירותים', render:(_, row) => {
+      // הצג אייקוני מונה רק בשורות של החודש הנוכחי
+      if (row.chodesh !== thisMonth) return null
+      const readings = monimMap[row.dirot_id]
+      if (!readings || readings.length === 0) return null
+      // קבץ לפי סוג
+      const byType = {}
+      readings.forEach(r => { byType[r.sug_mone] = (byType[r.sug_mone] ?? 0) + Number(r.skhum_leshalem ?? 0) })
+      return (
+        <button
+          onClick={e => {
+            e.stopPropagation()
+            navigate(`/monim?dirot_id=${row.dirot_id}`)
+          }}
+          title="יש קריאות מונה לחודש זה — לחץ לפרטים"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-medium text-amber-700"
+        >
+          {Object.entries(byType).map(([sug, skhum]) => (
+            <span key={sug} title={`${sug}: ${currency(skhum)}`}>
+              {UTIL_EMOJI[sug] ?? '📊'}
+            </span>
+          ))}
+          <span className="text-amber-600 text-[10px]">
+            {currency(Object.values(byType).reduce((s,v)=>s+v,0))}
+          </span>
+        </button>
+      )
+    }},
     { key:'actions', label:'', width:110, render:(_,row) => (
       <div className="flex gap-1 items-center">
         <button
