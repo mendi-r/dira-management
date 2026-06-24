@@ -11,24 +11,18 @@ import { FormField, Input, Select } from '../components/ui/FormField'
 import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../contexts/AuthContext'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SERVICE_KEY  = import.meta.env.VITE_SUPABASE_SERVICE_ROLE
-
-async function adminFetch(path, method = 'GET', body = null) {
-  if (!SERVICE_KEY) throw new Error('חסר VITE_SUPABASE_SERVICE_ROLE ב-Vercel')
-  const opts = {
-    method,
+async function adminApi(action, params = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch('/api/admin', {
+    method: 'POST',
     headers: {
-      'Authorization': 'Bearer ' + SERVICE_KEY,
-      'apikey': SERVICE_KEY,
-      'Content-Type': 'application/json'
-    }
-  }
-  if (body) opts.body = JSON.stringify(body)
-  const res = await fetch(SUPABASE_URL + '/auth/v1/admin' + path, opts)
-  if (method === 'DELETE' && res.status === 204) return {}
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + (session?.access_token ?? '')
+    },
+    body: JSON.stringify({ action, ...params })
+  })
   const json = await res.json()
-  if (!res.ok) throw new Error(json.msg || json.message || 'שגיאת API')
+  if (!res.ok) throw new Error(json.error || 'שגיאת API')
   return json
 }
 
@@ -60,7 +54,7 @@ export default function UserManagement() {
   const [form,        setForm]        = useState(EMPTY)
   const [showPw,      setShowPw]      = useState(false)
   const [saving,      setSaving]      = useState(false)
-  const hasAdmin = !!SERVICE_KEY
+  const hasAdmin = true
 
   useEffect(() => { load() }, [])
 
@@ -88,11 +82,7 @@ export default function UserManagement() {
     if (form.password.length < 6) { toast('סיסמא חייבת להיות לפחות 6 תווים', 'error'); return }
     setSaving(true)
     try {
-      const newUser = await adminFetch('/users', 'POST', {
-        email: form.email.trim(),
-        password: form.password,
-        email_confirm: true
-      })
+      const { user: newUser } = await adminApi('createUser', { email: form.email.trim(), password: form.password })
       await supabase.from('users_roles').upsert(
         { user_id: newUser.id, role: form.role },
         { onConflict: 'user_id' }
@@ -123,9 +113,7 @@ export default function UserManagement() {
     const msg = banned ? 'להסיר השעיה מ-' : 'להשעות את '
     if (!await confirm(msg + (u.email ?? u.user_id?.slice(0, 8)) + '?', { danger: !banned })) return
     try {
-      await adminFetch('/users/' + u.user_id, 'PUT', {
-        ban_duration: banned ? 'none' : '876600h'
-      })
+      await adminApi('banUser', { userId: u.user_id, ban: !banned })
       toast(banned ? 'ההשעיה הוסרה ✓' : 'המשתמש הושעה — יצא מהמערכת בפעם הבאה שיבצע פעולה ✓')
       load()
     } catch (e) {
@@ -136,7 +124,7 @@ export default function UserManagement() {
   async function removeUser(u) {
     if (!await confirm('למחוק את ' + (u.email ?? u.user_id?.slice(0, 8)) + '?', { danger: true })) return
     await supabase.from('users_roles').delete().eq('user_id', u.user_id)
-    try { await adminFetch('/users/' + u.user_id, 'DELETE') } catch (_) {}
+    try { await adminApi('deleteUser', { userId: u.user_id }) } catch (_) {}
     toast('המשתמש נמחק')
     load()
   }
