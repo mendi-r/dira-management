@@ -12,6 +12,7 @@ import { StatCard, Card, CardHeader, CardBody } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import AlertBanner from '../components/ui/AlertBanner'
 import { useAlerts } from '../contexts/AlertsContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const DASHBOARD_CACHE_KEY = 'dashboard_v1'
 const DASHBOARD_TTL = 60_000  // 60 שניות
@@ -33,6 +34,7 @@ function Clickable({ to, params = {}, children, className = '' }) {
 export default function Dashboard() {
   const navigate  = useNavigate()
   const { alerts } = useAlerts()
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   // אתחול ישיר מהמטמון — אם קיים, הרנדר הראשון כבר מציג תוכן ללא ספינר
   const [data, setData]       = useState(() => getCache(DASHBOARD_CACHE_KEY))
   const [loading, setLoading] = useState(() => getCache(DASHBOARD_CACHE_KEY) === null)
@@ -47,7 +49,8 @@ export default function Dashboard() {
     setLoading(true)
 
     // ── קריאת RPC אחת במקום 10 שאילתות נפרדות ──
-    const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats')
+    const rpcParams = (isSuperAdmin && viewAsOwnerId) ? { p_owner_id: viewAsOwnerId } : {}
+    const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats', rpcParams)
     if (rpcError || !stats) {
       console.error('Dashboard RPC error:', rpcError)
       setLoading(false)
@@ -130,6 +133,8 @@ export default function Dashboard() {
     setData(result)
     setLoading(false)
   }, [])
+
+  useEffect(() => { clearCache(DASHBOARD_CACHE_KEY); load(true) }, [viewAsOwnerId])
 
   useEffect(() => {
     load()

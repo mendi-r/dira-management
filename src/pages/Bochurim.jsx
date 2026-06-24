@@ -49,7 +49,9 @@ const TABS = [
   { key:'history',   label:'היסטוריה' },
 ]
 
+import { useAuth } from '../contexts/AuthContext'
 export default function Bochurim() {
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const [rows, setRows]         = useState([])
@@ -99,6 +101,7 @@ export default function Bochurim() {
   }, [statusFilter])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
   // סנכרון זמן-אמת
   useRealtime(['bochurim', 'shibutzim'], () => { clearCache(`bochurim_${statusFilter}`); clearCache('bochurim_'); clearCache('shibutzim_active_ids'); load(true) })
 

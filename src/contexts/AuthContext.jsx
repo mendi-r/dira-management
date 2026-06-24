@@ -6,6 +6,7 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null)
   const [role,    setRole]    = useState(null)
+  const [viewAsOwnerId, setViewAsOwnerId] = useState(null)
   const [loading, setLoading] = useState(true)
 
   async function loadRole(uid) {
@@ -35,10 +36,6 @@ export function AuthProvider({ children }) {
   const signOut = () => supabase.auth.signOut()
 
   return (
-    <AuthContext.Provider value={{ user, role, isAdmin: role === 'admin' || role === 'super_admin', isSuperAdmin: role === 'super_admin', loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, role, isAdmin: role === 'admin' || role === 'super_admin', isSuperAdmin: role === 'super_admin', loading, signIn, signOut, viewAsOwnerId, setViewAsOwnerId }}>
       {children}
-    </AuthContext.Provider>
-  )
-}
-
-export const useAuth = () => useContext(AuthContext)
+    </AuthContext.Provid

@@ -30,7 +30,9 @@ const EMPTY = {
 }
 const STATUS_COLORS = { שולם:'green', 'לא שולם':'red', חלקי:'yellow' }
 
+import { useAuth } from '../contexts/AuthContext'
 export default function Gviya() {
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const [rows, setRows]         = useState([])
@@ -62,6 +64,7 @@ export default function Gviya() {
   }, [statusFilter, monthFilter])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
   // סנכרון זמן-אמת
   useRealtime(['gviya', 'bochurim'], () => { load(true) })
 

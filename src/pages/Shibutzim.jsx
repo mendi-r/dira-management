@@ -56,7 +56,9 @@ function calcEndDate(startDate, months) {
   return d.toISOString().slice(0, 10)
 }
 
+import { useAuth } from '../contexts/AuthContext'
 export default function Shibutzim() {
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const [rows, setRows]         = useState([])
@@ -91,6 +93,7 @@ export default function Shibutzim() {
   }, [statusFilter])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
   // סנכרון זמן-אמת
   useRealtime(['shibutzim', 'bochurim', 'dirot'], () => { load(true) })
 

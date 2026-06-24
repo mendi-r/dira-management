@@ -31,7 +31,9 @@ const TABS_T = [
   { key:'docs',    label:'מסמכים' },
 ]
 
+import { useAuth } from '../contexts/AuthContext'
 export default function Tachzuka() {
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
   const [rows, setRows]       = useState([])
   const [dirot, setDirot]     = useState([])
@@ -70,6 +72,7 @@ export default function Tachzuka() {
   }, [statusFilter, adifutFilter])
 
   useEffect(() => { load() }, [load] )
+  useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
   // סנכרון זמן-אמת
   useRealtime(['tachzuka', 'vendors'], () => { load(true) })
 

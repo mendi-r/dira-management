@@ -28,7 +28,9 @@ const EMPTY = {
 }
 const STATUS_COLORS = { שולם:'green', 'לא שולם':'red', חלקי:'yellow' }
 
+import { useAuth } from '../contexts/AuthContext'
 export default function Tashlumim() {
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
   const [rows, setRows]       = useState([])
   const [dirot, setDirot]     = useState([])
@@ -70,6 +72,7 @@ export default function Tashlumim() {
   }, [statusFilter, monthFilter])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
   // סנכרון זמן-אמת
   useRealtime(['tashlumim_baalim', 'dirot'], () => { load(true) })
 

@@ -54,7 +54,9 @@ const TABS = [
   { key:'history', label:'שיבוצים' },
 ]
 
+import { useAuth } from '../contexts/AuthContext'
 export default function Dirot() {
+  const { isSuperAdmin, viewAsOwnerId } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const [rows, setRows]         = useState([])
@@ -126,6 +128,7 @@ export default function Dirot() {
   }, [statusFilter])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (isSuperAdmin) load(false) }, [viewAsOwnerId])
   // סנכרון זמן-אמת
   useRealtime('dirot', () => { load(true) })
 

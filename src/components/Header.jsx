@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Menu, LogOut, Bell, AlertTriangle, AlertCircle } from 'lucide-react'
+import { Menu, LogOut, Bell, AlertTriangle, AlertCircle, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import { Users } from 'lucide-react'
 import { useAlerts } from '../contexts/AlertsContext'
 
 const titles = {
@@ -23,7 +25,13 @@ const titles = {
 export default function Header({ onMenuClick }) {
   const { pathname } = useLocation()
   const navigate     = useNavigate()
-  const { user, signOut } = useAuth()
+  const { user, signOut, isSuperAdmin, viewAsOwnerId, setViewAsOwnerId } = useAuth()
+  const [usersList, setUsersList] = useState([])
+
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    supabase.rpc('get_users_with_roles').then(({ data }) => setUsersList(data ?? []))
+  }, [isSuperAdmin])
   const { alerts, total } = useAlerts()
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
@@ -60,6 +68,23 @@ export default function Header({ onMenuClick }) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* בורר יוזר — רק לסופר אדמין */}
+        {isSuperAdmin && usersList.length > 0 && (
+          <div className="flex items-center gap-2 border border-teal-200 rounded-lg px-2 py-1 bg-teal-50">
+            <Users size={14} className="text-teal-600 flex-shrink-0"/>
+            <select
+              value={viewAsOwnerId ?? ''}
+              onChange={e => setViewAsOwnerId(e.target.value || null)}
+              className="text-xs bg-transparent text-teal-700 font-medium focus:outline-none cursor-pointer max-w-[140px]"
+            >
+              <option value="">כל היוזרים</option>
+              {usersList.map(u => (
+                <option key={u.user_id} value={u.user_id}>{u.email ?? u.user_id?.slice(0,8)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Bell with alerts dropdown */}
         <div className="relative" ref={bellRef}>
           <button
