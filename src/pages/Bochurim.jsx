@@ -19,6 +19,7 @@ import FileUpload from '../components/ui/FileUpload'
 import AlertBanner from '../components/ui/AlertBanner'
 import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -52,6 +53,7 @@ const TABS = [
 
 export default function Bochurim() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
+  const { soonDays } = useSettings()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const [rows, setRows]         = useState([])
@@ -118,7 +120,7 @@ export default function Bochurim() {
   const filtered = rows.filter(r => {
     const textMatch = `${r.shem??''} ${r.mishpacha??''} ${r.telefon??''} ${r.email??''} ${r.ir_megurim??''} ${r.mekorot??''} ${r.kvutza_yeshiva??''}`
       .toLowerCase().includes(search.toLowerCase())
-    const alertMatch = alertFilter !== 'visa' || (daysUntil(r.tokef_viza) !== null && (daysUntil(r.tokef_viza) ?? 999) <= 30)
+    const alertMatch = alertFilter !== 'visa' || (daysUntil(r.tokef_viza) !== null && (daysUntil(r.tokef_viza) ?? 999) <= soonDays)
     const unassignedMatch = !unassignedFilter || !assignedIds.has(r.id)
     const assignedMatch   = !assignedFilter  ||  assignedIds.has(r.id)
     return textMatch && alertMatch && unassignedMatch && assignedMatch

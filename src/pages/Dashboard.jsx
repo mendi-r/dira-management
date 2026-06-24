@@ -13,6 +13,7 @@ import Badge from '../components/ui/Badge'
 import AlertBanner from '../components/ui/AlertBanner'
 import { useAlerts } from '../contexts/AlertsContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 
 const DASHBOARD_CACHE_KEY = 'dashboard_v1'
 const DASHBOARD_TTL = 60_000  // 60 שניות
@@ -35,6 +36,7 @@ export default function Dashboard() {
   const navigate  = useNavigate()
   const { alerts } = useAlerts()
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
+  const { soonDays } = useSettings()
   // אתחול ישיר מהמטמון — אם קיים, הרנדר הראשון כבר מציג תוכן ללא ספינר
   const [data, setData]       = useState(() => getCache(DASHBOARD_CACHE_KEY))
   const [loading, setLoading] = useState(() => getCache(DASHBOARD_CACHE_KEY) === null)
@@ -118,7 +120,6 @@ export default function Dashboard() {
     const openDebts = Object.values(debtByBochur).filter(d => d.total > 0).sort((a,b) => b.total - a.total)
 
     const overdueCount     = gviyaOpen.filter(g => g.taarich && new Date(g.taarich) < new Date()).length
-    const contractEndCount = dirot.filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
 
     // ── זמינות מיטות לפי דירה — חלון בין סיום שיבוצים לסוף חוזה ──
     const todayStr = new Date().toISOString().slice(0, 10)
@@ -187,10 +188,11 @@ export default function Dashboard() {
       tashlumimTotal, netProfit,
       dirotStats, openDebts,
       tachzukaOpen: tachzukaOpen??[],
-      overdueCount, contractEndCount,
+      overdueCount,
       currentMonth,
       utilTypes, utilityTotal, dirotWithReadings,
       dirotById, availabilityWindows, totalFutureBeds,
+      dirot, // לחישוב contractEndCount ב-render לפי soonDays
     }
     setCache(DASHBOARD_CACHE_KEY, result, DASHBOARD_TTL)
     setData(result)
@@ -230,9 +232,27 @@ export default function Dashboard() {
   const { bochurimCount, dirotCount, shibutzimCount, totalBeds, occupiedBeds, freeBeds, freeApartments,
           unassigned, gviyaTotal, gviyaCollected, gviyaOutstanding,
           tashlumimTotal, netProfit, dirotStats, openDebts,
-          tachzukaOpen, overdueCount, contractEndCount, currentMonth,
+          tachzukaOpen, overdueCount, currentMonth,
           utilTypes, utilityTotal, dirotWithReadings,
-          availabilityWindows = [], totalFutureBeds = 0 } = data
+          availabilityWindows = [], totalFutureBeds = 0,
+          dirot: dirotRaw = [] } = data
+
+  // חישוב "בקרוב" לפי הגדרת soonDays
+  const todayForCalc = new Date().toISOString().slice(0, 10)
+  const soonDateStr  = (() => { const d = new Date(todayForCalc); d.setDate(d.getDate() + soonDays); return d.toISOString().slice(0, 10) })()
+
+  const contractEndCount = dirotRaw.filter(d => { const r = daysUntil(d.sofit_schirut); return r !== null && r <= soonDays && r >= 0 }).length
+
+  // מיטות שמתפנות בתוך soonDays ימים (לא פנויות כבר עכשיו)
+  const soonFutureBeds = availabilityWindows.reduce((s, w) => {
+    const ms = w.milestones.filter(m => !m.isNow && m.fromDate <= soonDateStr)
+    return s + (ms.length > 0 ? Math.max(...ms.map(m => m.freeBeds)) : 0)
+  }, 0)
+  // דירות שמתפנות בתוך soonDays ימים (לא כולל פנויות עכשיו)
+  const soonApartments = availabilityWindows.filter(w =>
+    !w.milestones.some(m => m.isNow) &&
+    w.milestones.some(m => !m.isNow && m.fromDate <= soonDateStr)
+  ).length
 
   return (
     <div className="space-y-6 fade-in">
@@ -258,7 +278,7 @@ export default function Dashboard() {
             )}
             {contractEndCount > 0 && (
               <div className="cursor-pointer hover:underline" onClick={()=>navigate('/dirot?alert=contract')}>
-                • {contractEndCount} חוזים מסתיימים תוך 30 יום
+                • {contractEndCount} חוזים מסתיימים תוך {soonDays} יום
               </div>
             )}
             {alerts.filter(a=>a.type==='visa').length > 0 && (
@@ -281,7 +301,8 @@ export default function Dashboard() {
           <StatCard label="בחורים" value={bochurimCount??0} icon={Users} color="teal"/>
         </Clickable>
         <Clickable to="/dirot">
-          <StatCard label="דירות" value={dirotCount??0} icon={Home} color="blue"/>
+          <StatCard label="דירות" value={dirotCount??0} icon={Home} color="blue"
+            sub={soonApartments > 0 ? `${soonApartments} מתפנות בקרוב` : undefined}/>
         </Clickable>
         <Clickable to="/shibutzim" params={{ status:'פעיל' }}>
           <StatCard label="שיבוצים פעילים" value={shibutzimCount} icon={Shuffle} color="green"/>
@@ -292,10 +313,12 @@ export default function Dashboard() {
         <Clickable to="/dirot" params={{ free_beds:'true' }}>
           <StatCard label="דירות פנויות" value={freeApartments} icon={Bed} color="teal"
             sub={freeBeds > 0
-              ? `${freeBeds} פנויות כעת`
-              : totalFutureBeds > 0
-                ? `${totalFutureBeds} מתפנות בקרוב`
-                : 'כל המיטות תפוסות'}/>
+              ? `${freeBeds} מיטות פנויות כעת`
+              : soonFutureBeds > 0
+                ? `${soonFutureBeds} מיטות מתפנות בקרוב`
+                : totalFutureBeds > 0
+                  ? `${totalFutureBeds} מיטות מתפנות בהמשך`
+                  : 'כל המיטות תפוסות'}/>
         </Clickable>
       </div>
 

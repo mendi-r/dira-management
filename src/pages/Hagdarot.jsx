@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle, Download, Gauge } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2, Settings, AlertTriangle, Download, Gauge, Bell } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { confirm } from '../lib/confirm'
 import { Table } from '../components/ui/Table'
@@ -10,11 +10,13 @@ import Badge from '../components/ui/Badge'
 import { FormField, Input, Select, Textarea } from '../components/ui/FormField'
 import { useToast } from '../components/ui/Toast'
 import { Card, CardHeader, CardBody } from '../components/ui/Card'
+import { useSettings } from '../contexts/SettingsContext'
 
 const EMPTY = { mafteach: '', erech: '', sug: 'כללי', teur: '' }
 
 export default function Hagdarot() {
   const toast = useToast()
+  const { soonDays, setSoonDays } = useSettings()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
@@ -188,6 +190,38 @@ export default function Hagdarot() {
               <p className="font-semibold text-teal-800">הגדרות מערכת</p>
               <p className="text-sm text-teal-600 mt-0.5">ניהול פרמטרים גלובליים של המערכת, כולל תעריפים, ברירות מחדל וקטגוריות.</p>
             </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* כרטיס הגדרות התראות */}
+      <Card>
+        <CardHeader title="הגדרות התראות" subtitle="הגדר כמה ימים מראש להציג התראות 'בקרוב' בכל המערכת" />
+        <CardBody>
+          <div className="flex items-center gap-4 flex-wrap">
+            <Bell size={18} className="text-amber-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-slate-700 mb-1">ימי התראה מראש</p>
+              <p className="text-xs text-slate-400">חוזים, ויזות, ביטוחים ומיטות מתפנות — יוצגו כ"בקרוב" בהתאם לערך שנבחר</p>
+            </div>
+            <div className="flex gap-2">
+              {[30, 60, 90].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setSoonDays(d)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                    soonDays === d
+                      ? 'bg-teal-500 text-white border-teal-500'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300 hover:text-teal-600'
+                  }`}
+                >
+                  {d} יום
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+              נבחר: <strong>{soonDays} יום</strong>
+            </span>
           </div>
         </CardBody>
       </Card>

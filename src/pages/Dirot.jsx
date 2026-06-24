@@ -18,6 +18,7 @@ import DualDateField from '../components/ui/DualDateField'
 import FileUpload from '../components/ui/FileUpload'
 import AlertBanner from '../components/ui/AlertBanner'
 import { useToast } from '../components/ui/Toast'
+import { useSettings } from '../contexts/SettingsContext'
 
 function exportCSV(data, filename) {
   if (!data.length) return
@@ -57,6 +58,7 @@ const TABS = [
 import { useAuth } from '../contexts/AuthContext'
 export default function Dirot() {
   const { isSuperAdmin, viewAsOwnerId } = useAuth()
+  const { soonDays } = useSettings()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const [rows, setRows]         = useState([])
@@ -184,8 +186,8 @@ export default function Dirot() {
     const textMatch = `${r.ktovet??''} ${r.ir??''} ${r.mishkan??''} ${r.mazkir??''} ${r.baalim_shem??''}`
       .toLowerCase().includes(search.toLowerCase())
     const alertMatch = !alertFilter ||
-      (alertFilter === 'contract' && daysUntil(r.sofit_schirut) !== null && (daysUntil(r.sofit_schirut)??999) <= 30) ||
-      (alertFilter === 'insurance' && daysUntil(r.bituach_chadush) !== null && (daysUntil(r.bituach_chadush)??999) <= 30)
+      (alertFilter === 'contract' && daysUntil(r.sofit_schirut) !== null && (daysUntil(r.sofit_schirut)??999) <= soonDays) ||
+      (alertFilter === 'insurance' && daysUntil(r.bituach_chadush) !== null && (daysUntil(r.bituach_chadush)??999) <= soonDays)
     const freeBedMatch = !freeBedFilter ||
       ((r.mispar_mitot ?? 0) - (occupantsMap[r.id] ?? 0)) > 0 ||
       !!availabilityMap[r.id]  // מתפנות בעתיד

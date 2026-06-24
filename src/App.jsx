@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AlertsProvider } from './contexts/AlertsContext'
+import { SettingsProvider } from './contexts/SettingsContext'
 import { ToastProvider } from './components/ui/Toast'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -84,6 +85,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <ToastProvider>
+      <SettingsProvider>
       <AuthProvider>
         <AlertsProvider>
           <BrowserRouter>
@@ -93,6 +95,7 @@ export default function App() {
           </BrowserRouter>
         </AlertsProvider>
       </AuthProvider>
+      </SettingsProvider>
     </ToastProvider>
   )
 }

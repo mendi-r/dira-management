@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { daysUntil } from '../lib/utils'
 import { useAuth } from './AuthContext'
+import { getSettings } from '../lib/settings'
 
 const AlertsCtx = createContext({ alerts: [], total: 0, reload: () => {} })
 
@@ -12,6 +13,7 @@ export function AlertsProvider({ children }) {
   async function load() {
     // שעון ישראל — ללא network call
     const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' })
+    const { soonDays } = getSettings()
 
     const [{ data: bochurim }, { data: dirot }, { data: calEvs }] = await Promise.all([
       supabase.from('bochurim').select('id,shem,mishpacha,tokef_viza').not('tokef_viza','is',null),
@@ -23,10 +25,10 @@ export function AlertsProvider({ children }) {
 
     const list = []
 
-    // ויזות פוגות תוך 30 יום
+    // ויזות פוגות תוך X ימים
     ;(bochurim ?? []).forEach(b => {
       const d = daysUntil(b.tokef_viza)
-      if (d !== null && d <= 30 && d >= -7) {
+      if (d !== null && d <= soonDays && d >= -7) {
         list.push({
           type: 'visa',
           severity: d < 0 ? 'error' : d <= 7 ? 'error' : 'warning',
@@ -37,10 +39,10 @@ export function AlertsProvider({ children }) {
       }
     })
 
-    // חוזים מסתיימים תוך 30 יום
+    // חוזים מסתיימים תוך X ימים
     ;(dirot ?? []).forEach(d => {
       const dc = daysUntil(d.sofit_schirut)
-      if (dc !== null && dc <= 30 && dc >= -7) {
+      if (dc !== null && dc <= soonDays && dc >= -7) {
         list.push({
           type: 'contract',
           severity: dc < 0 ? 'error' : dc <= 7 ? 'error' : 'warning',
@@ -51,7 +53,7 @@ export function AlertsProvider({ children }) {
       }
       // ביטוח
       const db = daysUntil(d.bituach_chadush)
-      if (db !== null && db <= 30 && db >= -7) {
+      if (db !== null && db <= soonDays && db >= -7) {
         list.push({
           type: 'insurance',
           severity: db < 0 ? 'error' : 'warning',
