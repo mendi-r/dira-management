@@ -31,10 +31,11 @@ const EMPTY = {
   ktovet:'', ir:'', mishkan:'', mazkir:'', mispar_chadarim:'',
   mispar_mitot:'', mispar_sherutim:'', mispar_miklachot:'',
   perut_riut:'', sheon_mayim_num:'', sheon_chashmal_num:'', sheon_gaz_num:'',
-  arnona:'', status:'פעיל', heara:'',
+  arnona:'', status:'פעיל', status_vaad:'', luch_shanah:'לועזי', heara:'',
   baalim_shem:'', baalim_telefon1:'', baalim_telefon2:'', baalim_email:'',
   baalim_ktovet_rechov:'', baalim_ktovet_ir:'',
   ola_schirut_chodshi:'', tchilat_schirut:'', mispar_chodashim:'', sofit_schirut:'',
+  hearot_chozeh:'',
   payment_method:'', payment_day:'', payment_source:'', payment_bank_details:'',
   bituach_chevra:'', bituach_polisa:'', bituach_chadush:'',
   google_maps_link:'', drive_link:'',
@@ -71,7 +72,7 @@ export default function Dirot() {
   const [originalRent, setOriginalRent] = useState(null)
   const [originalMisparChodashim, setOriginalMisparChodashim] = useState(null)
   const [renewModal, setRenewModal] = useState(false)
-  const [renewForm, setRenewForm]   = useState({ tchilat_schirut:'', mispar_chodashim:'', ola_schirut_chodshi:'' })
+  const [renewForm, setRenewForm]   = useState({ tchilat_schirut:'', mispar_chodashim:'', ola_schirut_chodshi:'', hearot_chozeh:'' })
   const [renewSaving, setRenewSaving] = useState(false)
   const [chozim, setChozim]           = useState([])
   const [chozimCountMap, setChozimCountMap] = useState({})
@@ -152,17 +153,25 @@ export default function Dirot() {
   })
 
   function openNew()  { setForm(EMPTY); setActiveTab('dira'); setHistory([]); setOriginalRent(null); setOriginalMisparChodashim(null); setModal(true) }
-  function openEdit(r){
+  async function openEdit(r){
     setForm({
       ...EMPTY, ...r,
       tchilat_schirut: toInputDate(r.tchilat_schirut),
       sofit_schirut:   toInputDate(r.sofit_schirut),
       bituach_chadush: toInputDate(r.bituach_chadush),
+      hearot_chozeh: '',
     })
     setOriginalRent(r.ola_schirut_chodshi ?? null)
     setOriginalMisparChodashim(r.mispar_chodashim ?? null)
     setActiveTab('dira')
-    if (r.id) loadHistory(r.id)
+    if (r.id) {
+      loadHistory(r.id)
+      // טעינת הערות החוזה הפעיל האחרון
+      const { data: latestChozeh } = await supabase.from('chozim')
+        .select('hearot').eq('dirot_id', r.id)
+        .order('tchilat_schirut', { ascending: false }).limit(1).single()
+      if (latestChozeh?.hearot) setForm(f => ({ ...f, hearot_chozeh: latestChozeh.hearot }))
+    }
     setModal(true)
   }
 
@@ -280,6 +289,7 @@ export default function Dirot() {
           sofit_schirut: payload.sofit_schirut || null,
           mispar_chodashim: payload.mispar_chodashim,
           ola_schirut_chodshi: payload.ola_schirut_chodshi,
+          hearot: payload.hearot_chozeh || null,
           status: 'פעיל',
         })
       }
@@ -448,6 +458,7 @@ export default function Dirot() {
       sofit_schirut: newEnd || null,
       mispar_chodashim: newMonths,
       ola_schirut_chodshi: newRent,
+      hearot: renewForm.hearot_chozeh || null,
     })
 
     logActivity('RENEW', 'dirot', form.id, form.ktovet)
@@ -741,6 +752,22 @@ export default function Dirot() {
                 <option value="לא_פעיל">לא פעיל</option>
               </Select>
             </FormField>
+            <FormField label="סטטוס ועד">
+              <Select value={form.status_vaad??''} onChange={set('status_vaad')}>
+                <option value="">-- בחר --</option>
+                <option value="חתום מול הועד">חתום מול הועד</option>
+                <option value="אינו תחת הועד">אינו תחת הועד</option>
+                <option value="מאושר">מאושר</option>
+                <option value="חתום מול הישיבה">חתום מול הישיבה</option>
+                <option value="עדיין לא נבדק">עדיין לא נבדק</option>
+              </Select>
+            </FormField>
+            <FormField label="לוח שנה לשכירות">
+              <Select value={form.luch_shanah??'לועזי'} onChange={set('luch_shanah')}>
+                <option value="לועזי">לועזי</option>
+                <option value="עברי">עברי</option>
+              </Select>
+            </FormField>
             <FormField label="קישור Google Maps">
               <div className="flex items-center gap-2">
                 <Input value={form.google_maps_link??''} onChange={set('google_maps_link')} placeholder="https://maps.google.com/..."/>
@@ -850,6 +877,12 @@ export default function Dirot() {
             <FormField label="יום חיוב בחודש"><Input type="number" min="1" max="31" value={form.payment_day??''} onChange={set('payment_day')} placeholder="1"/></FormField>
             <FormField label="מקור תשלום (בנק/אשראי)"><Input value={form.payment_source??''} onChange={set('payment_source')} placeholder="בנק לאומי / ויזה"/></FormField>
             <FormField label="פרטי חשבון"><Input value={form.payment_bank_details??''} onChange={set('payment_bank_details')} placeholder="סניף 123, חשבון 456789"/></FormField>
+            <hr className="sm:col-span-2 border-slate-100"/>
+            <div className="sm:col-span-2">
+              <FormField label="הערות חוזה (לחוזה הנוכחי בלבד)">
+                <Textarea value={form.hearot_chozeh??''} onChange={set('hearot_chozeh')} rows={3} placeholder="הערות לחוזה זה..."/>
+              </FormField>
+            </div>
           </div>
         )}
 
@@ -1035,42 +1068,4 @@ export default function Dirot() {
       <Modal open={renewModal} onClose={()=>setRenewModal(false)} title={`חידוש חוזה — ${form.ktovet ?? ''}`} size="sm">
         <div className="space-y-4">
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
-            חוזה נוכחי: <strong>{formatDate(form.tchilat_schirut)}</strong> עד <strong>{formatDate(form.sofit_schirut)}</strong>
-          </div>
-          <FormField label="תאריך תחילה חדש" required>
-            <Input type="date" value={renewForm.tchilat_schirut}
-              min={form.sofit_schirut || undefined}
-              onChange={e => {
-                const val = e.target.value
-                const newEnd = calcLeaseEnd(val, renewForm.mispar_chodashim)
-                setRenewForm(f => ({ ...f, tchilat_schirut: val, _sofit: newEnd }))
-              }}/>
-          </FormField>
-          <FormField label="מספר חודשים" required>
-            <Input type="number" min="1" value={renewForm.mispar_chodashim}
-              onChange={e => {
-                const val = e.target.value
-                const newEnd = calcLeaseEnd(renewForm.tchilat_schirut, val)
-                setRenewForm(f => ({ ...f, mispar_chodashim: val, _sofit: newEnd }))
-              }} placeholder="12"/>
-            {renewForm._sofit && (
-              <p className="text-xs text-teal-600 mt-1 px-1">סיום: {formatDate(renewForm._sofit)}</p>
-            )}
-          </FormField>
-          <FormField label="עלות שכירות חודשית (₪)" required>
-            <Input type="number" min="0" value={renewForm.ola_schirut_chodshi}
-              onChange={e => setRenewForm(f => ({ ...f, ola_schirut_chodshi: e.target.value }))}/>
-          </FormField>
-          <p className="text-xs text-slate-500">
-            ✓ יווצרו שורות תשלום לבעלים לתקופה החדשה<br/>
-            ✓ ההיסטוריה של החוזה הנוכחי תישמר בתנו</p>
-          <div className="flex justify-end gap-3 mt-4">
-            <Button variant="secondary" onClick={() => setRenewModal(false)}>ביטול</Button>
-            <Button loading={renewSaving} onClick={renewContract}>חדש חוזה</Button>
-          </div>
-        </div>
-      </Modal>
-
-      </div>
-  )
-}
+            חוזה נוכחי: <strong>{formatDate(form.tchilat_schirut)}</stro
