@@ -452,8 +452,8 @@ export default function Shibutzim() {
       mispar_chodashim: form.mispar_chodashim ? Number(form.mispar_chodashim) : null,
     }
     const { data, error } = isNew
-      ? await supabase.from('shibutzim').insert(payload).select().single()
-      : await supabase.from('shibutzim').update(payload).eq('id', form.id).select().single()
+      ? await supabase.from('shibutzim').insert(payload).select('*, bochurim!bochurim_id(shem,mishpacha,telefon), dirot!dirot_id(ktovet,ir,ola_schirut_chodshi,mispar_mitot)').single()
+      : await supabase.from('shibutzim').update(payload).eq('id', form.id).select('*, bochurim!bochurim_id(shem,mishpacha,telefon), dirot!dirot_id(ktovet,ir,ola_schirut_chodshi,mispar_mitot)').single()
     if (error) { setSaving(false); toast(error.message, 'error'); return }
 
     // סגירת המודל מיד לאחר שמירה ב-DB (לפני פעולות חיוב)
@@ -461,7 +461,12 @@ export default function Shibutzim() {
     setSaving(false)
     toast(isNew ? 'שיבוץ נוסף' : 'עודכן')
     setModal(false)
-    load(true)
+    // עדכון מיידי — ללא load מחדש
+    if (isNew) {
+      setRows(prev => [...prev, data])
+    } else {
+      setRows(prev => prev.map(r => r.id === data.id ? data : r))
+    }
 
     // שמירת ערכי הטופס לפני שינויי state
     const _bochurimId   = form.bochurim_id

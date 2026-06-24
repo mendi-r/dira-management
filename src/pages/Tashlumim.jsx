@@ -122,23 +122,28 @@ export default function Tashlumim() {
     payload.status = paid >= total ? 'שולם' : paid > 0 ? 'חלקי' : 'לא שולם'
 
     const isNew = !form.id
-    const { error } = isNew
-      ? await supabase.from('tashlumim_baalim').insert(payload)
-      : await supabase.from('tashlumim_baalim').update(payload).eq('id', form.id)
+    const { data, error } = isNew
+      ? await supabase.from('tashlumim_baalim').insert(payload).select('*, dirot(ktovet,ir,baalim_shem,baalim_telefon1)').single()
+      : await supabase.from('tashlumim_baalim').update(payload).eq('id', form.id).select('*, dirot(ktovet,ir,baalim_shem,baalim_telefon1)').single()
     setSaving(false)
     if (error) { toast(error.message, 'error'); return }
     toast(isNew ? 'נוסף' : 'עודכן')
-    setModal(false); load(true)
+    setModal(false)
+    if (isNew) {
+      setRows(prev => [...prev, data])
+    } else {
+      setRows(prev => prev.map(r => r.id === data.id ? data : r))
+    }
   }
 
   async function remove(id) {
     if (!await confirm('למחוק תשלום זה?', { danger: true })) return
     await supabase.from('tashlumim_baalim').delete().eq('id', id)
-    toast('נמחק'); load(true)
+    toast('נמחק')
+    setRows(prev => prev.filter(r => r.id !== id))
   }
 
   async function deleteAll() {
-    // מחיקה קבוצתית רק אם יש סינון פעיל (לא מאפשר מחיקת הכל ללא סינון)
     if (!statusFilter && !monthFilter && !search) {
       toast('יש לסנן לפני מחיקה קבוצתית — בחר סטטוס, חודש או חפש', 'error')
       return
@@ -153,7 +158,7 @@ export default function Tashlumim() {
     const { error } = await supabase.from('tashlumim_baalim').delete().in('id', ids)
     if (error) { toast(error.message, 'error'); return }
     toast(`נמחקו ${ids.length} רשומות`)
-    load(true)
+    setRows(prev => prev.filter(r => !ids.includes(r.id)))
   }
 
   async function togglePaid(row) {

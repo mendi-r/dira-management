@@ -156,8 +156,13 @@ export default function Bochurim() {
     logActivity(isNew ? 'INSERT' : 'UPDATE', 'bochurim', data.id, `${form.shem} ${form.mishpacha}`)
     toast(isNew ? 'בחור נוסף בהצלחה' : 'עודכן בהצלחה')
     if (isNew) setForm(f => ({ ...f, id: data.id }))
+    // עדכון מיידי של ה-state — ללא המתנה לload מחדש
+    if (isNew) {
+      setRows(prev => [data, ...prev])
+    } else {
+      setRows(prev => prev.map(r => r.id === data.id ? { ...r, ...data } : r))
+    }
     clearCache(`bochurim_${statusFilter}`); clearCache('bochurim_')
-    load(true)
   }
 
   async function remove(id, name) {

@@ -102,23 +102,28 @@ export default function Gviya() {
     payload.status = paid >= total ? 'שולם' : paid > 0 ? 'חלקי' : 'לא שולם'
 
     const isNew = !form.id
-    const { error } = isNew
-      ? await supabase.from('gviya').insert(payload)
-      : await supabase.from('gviya').update(payload).eq('id', form.id)
+    const { data, error } = isNew
+      ? await supabase.from('gviya').insert(payload).select('*, bochurim!bochurim_id(shem,mishpacha,telefon,amla_chodshit), dirot!dirot_id(ktovet,ir)').single()
+      : await supabase.from('gviya').update(payload).eq('id', form.id).select('*, bochurim!bochurim_id(shem,mishpacha,telefon,amla_chodshit), dirot!dirot_id(ktovet,ir)').single()
     setSaving(false)
     if (error) { toast(error.message,'error'); return }
     toast(isNew ? 'נוסף' : 'עודכן')
-    setModal(false); load(true)
+    setModal(false)
+    if (isNew) {
+      setRows(prev => [...prev, data])
+    } else {
+      setRows(prev => prev.map(r => r.id === data.id ? data : r))
+    }
   }
 
   async function remove(id) {
     if (!await confirm('למחוק?', { danger: true })) return
     await supabase.from('gviya').delete().eq('id', id)
-    toast('נמחק'); load(true)
+    toast('נמחק')
+    setRows(prev => prev.filter(r => r.id !== id))
   }
 
   async function deleteAll() {
-    // חובה שיהיה סינון פעיל — אסור למחוק הכל ללא סינון
     if (!statusFilter && !monthFilter && !search) {
       toast('יש לסנן לפני מחיקה — בחר סטטוס, חודש או חפש', 'error')
       return
@@ -133,19 +138,23 @@ export default function Gviya() {
     const { error } = await supabase.from('gviya').delete().in('id', ids)
     if (error) { toast(error.message, 'error'); return }
     toast(`נמחקו ${ids.length} רשומות`)
-    load(true)
+    setRows(prev => prev.filter(r => !ids.includes(r.id)))
   }
 
   async function togglePaid(row) {
     const isFullyPaid = row.status === 'שולם'
-    const { error } = await supabase.from('gviya').update(
-      isFullyPaid
-        ? { skhum_shulam: 0, status: 'לא שולם' }
-        : { skhum_shulam: row.skhum, status: 'שולם' }
-    ).eq('id', row.id)
-    if (error) { toast(error.message, 'error'); return }
+    const updates = isFullyPaid
+      ? { skhum_shulam: 0, status: 'לא שולם' }
+      : { skhum_shulam: row.skhum, status: 'שולם' }
+    // עדכון מיידי של ה-UI — לפני תשובת השרת
+    setRows(prev => prev.map(r => r.id === row.id ? { ...r, ...updates } : r))
+    const { error } = await supabase.from('gviya').update(updates).eq('id', row.id)
+    if (error) {
+      // rollback אם השרת נכשל
+      setRows(prev => prev.map(r => r.id === row.id ? row : r))
+      toast(error.message, 'error'); return
+    }
     toast(isFullyPaid ? 'סומן כלא שולם' : 'סומן כשולם ✓')
-    load(true)
   }
 
   const todayDate = new Date(); todayDate.setHours(0,0,0,0)
