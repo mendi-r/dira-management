@@ -16,6 +16,16 @@ export function AuthProvider({ children }) {
     setRole(data?.role ?? 'viewer')
   }
 
+  // בדיקת ban פעיל — מגרש מושעים מיד בלי להמתין לפקיעת Token
+  async function checkBanStatus() {
+    const { data: { user: freshUser }, error } = await supabase.auth.getUser()
+    if (error || !freshUser) { await supabase.auth.signOut(); return }
+    const bannedUntil = freshUser.banned_until
+    if (bannedUntil && new Date(bannedUntil) > new Date()) {
+      await supabase.auth.signOut()
+    }
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const u = data.session?.user ?? null
@@ -27,9 +37,21 @@ export function AuthProvider({ children }) {
       const u = session?.user ?? null
       setUser(u)
       loadRole(u?.id)
+      // אם יוזר נכנס — בדוק מיד אם הוא מושעה
+      if (u) checkBanStatus()
     })
 
-    return () => subscription.unsubscribe()
+    // בדיקת ban כל 30 שניות לכל יוזר מחובר
+    const banInterval = setInterval(() => {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user) checkBanStatus()
+      })
+    }, 30_000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearInterval(banInterval)
+    }
   }, [])
 
   const signIn  = (email, password) => supabase.auth.signInWithPassword({ email, password })
