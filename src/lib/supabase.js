@@ -6,11 +6,6 @@ const serviceRoleKey  = import.meta.env.VITE_SUPABASE_SERVICE_ROLE
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-export const supabaseAdmin = serviceRoleKey
-  ? createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-  : null
 
 export function formatDate(dateStr) {
   if (!dateStr) return '—'
