@@ -142,8 +142,8 @@ export default function Dashboard() {
 
       // שיבוצים שמסתיימים לפני סוף החוזה
       const endingShib = diraShib
-        .filter(s => s.taarich_sium && s.taarich_sium < sofit)
-        .sort((a, b) => a.taarich_sium.localeCompare(b.taarich_sium))
+        .filter(s => s.taarich_siyum && s.taarich_siyum < sofit)
+        .sort((a, b) => a.taarich_siyum.localeCompare(b.taarich_siyum))
 
       if (currentFree === 0 && endingShib.length === 0) return
 
@@ -155,10 +155,10 @@ export default function Dashboard() {
       }
 
       // מתי כל שיבוץ מסתיים — תאריכים ייחודיים
-      const uniqueEnds = [...new Set(endingShib.map(s => s.taarich_sium))]
+      const uniqueEnds = [...new Set(endingShib.map(s => s.taarich_siyum))]
       uniqueEnds.forEach(endDate => {
         const stillActive = diraShib.filter(
-          sh => !sh.taarich_sium || sh.taarich_sium > endDate
+          sh => !sh.taarich_siyum || sh.taarich_siyum > endDate
         ).length
         const free = totalBeds2 - stillActive
         if (free > 0) {

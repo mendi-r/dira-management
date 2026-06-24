@@ -80,6 +80,8 @@ export default function Dirot() {
   const [chozim, setChozim]           = useState([])
   const [chozimCountMap, setChozimCountMap] = useState({})
   const [currentRentMap, setCurrentRentMap] = useState({})
+  const [availabilityMap, setAvailabilityMap] = useState({})
+  const [availPopup, setAvailPopup]   = useState(null) // dirot_id
   const [editChoza, setEditChoza]     = useState(null)
   const [editChozaForm, setEditChozaForm] = useState({})
   const [editChozaSaving, setEditChozaSaving] = useState(false)
@@ -90,7 +92,7 @@ export default function Dirot() {
     if (statusFilter) q = q.eq('status', statusFilter)
     const [{ data }, { data: activeShibutzim }, { data: chozimAll }] = await Promise.all([
       q,
-      supabase.from('shibutzim').select('dirot_id').eq('status','פעיל'),
+      supabase.from('shibutzim').select('dirot_id, taarich_siyum').eq('status','פעיל'),
       supabase.from('chozim').select('dirot_id, tchilat_schirut, sofit_schirut, ola_schirut_chodshi'),
     ])
     const rows = data ?? []
@@ -117,6 +119,36 @@ export default function Dirot() {
       }
     })
     setCurrentRentMap(rMap)
+
+    // ── חישוב חלונות זמינות מיטות לפי דירה ──
+    const todayStr = new Date().toISOString().slice(0, 10)
+    function dayAfter(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10)
+    }
+    const avMap = {}
+    rows.forEach(d => {
+      const sofit = d.sofit_schirut
+      if (!sofit || sofit <= todayStr) return
+      const totalBeds = Number(d.mispar_mitot ?? 0)
+      if (!totalBeds) return
+      const diraShib = (activeShibutzim ?? []).filter(s => s.dirot_id === d.id)
+      const currentFree = totalBeds - diraShib.length
+      const endingShib = diraShib
+        .filter(s => s.taarich_siyum && s.taarich_siyum < sofit)
+        .sort((a, b) => a.taarich_siyum.localeCompare(b.taarich_siyum))
+      if (currentFree === 0 && endingShib.length === 0) return
+      const milestones = []
+      if (currentFree > 0) milestones.push({ fromDate: todayStr, freeBeds: currentFree, isNow: true })
+      const uniqueEnds = [...new Set(endingShib.map(s => s.taarich_siyum))]
+      uniqueEnds.forEach(endDate => {
+        const stillActive = diraShib.filter(sh => !sh.taarich_siyum || sh.taarich_siyum > endDate).length
+        const free = totalBeds - stillActive
+        if (free > 0) milestones.push({ fromDate: dayAfter(endDate), freeBeds: free, isNow: false })
+      })
+      if (milestones.length > 0) avMap[d.id] = { sofit, milestones }
+    })
+    setAvailabilityMap(avMap)
+
     setRows(rows)
     const warn = rows.filter(r => {
       const dc = r.sofit_schirut ? daysUntil(r.sofit_schirut) : null
@@ -671,6 +703,20 @@ export default function Dirot() {
         </div>
       )
     }},
+    { key:'_avail', label:'זמינות', render:(_, r) => {
+      const av = availabilityMap[r.id]
+      if (!av) return null
+      const ms = av.milestones[0]
+      return (
+        <button
+          onClick={e => { e.stopPropagation(); setAvailPopup(p => p === r.id ? null : r.id) }}
+          className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors"
+        >
+          🛏 {ms.isNow ? 'פנוי עכשיו' : `מ-${formatDate(ms.fromDate)}`}
+          {av.milestones.length > 1 && <span className="text-blue-400 mr-0.5">+{av.milestones.length - 1}</span>}
+        </button>
+      )
+    }},
     { key:'status',      label:'סטטוס', render:v=><Badge color={STATUS_COLORS[v]??'gray'}>{v??'—'}</Badge> },
     { key:'actions',     label:'', width:80, render:(_,row)=>(
       <div className="flex gap-1">
@@ -680,8 +726,40 @@ export default function Dirot() {
     )},
   ]
 
+  // ── Popup זמינות מיטות ──
+  const AvailPopup = availPopup && availabilityMap[availPopup] && (() => {
+    const av = availabilityMap[availPopup]
+    const row = rows.find(r => r.id === availPopup)
+    if (!row) return null
+    return (
+      <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center" onClick={() => setAvailPopup(null)}>
+        <div className="bg-white rounded-2xl shadow-xl p-5 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-bold text-slate-800">{row.ktovet}{row.ir ? `, ${row.ir}` : ''}</h3>
+            <button onClick={() => setAvailPopup(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none px-1">×</button>
+          </div>
+          <p className="text-xs text-slate-400 mb-3">חוזה עד {formatDate(av.sofit)}</p>
+          <div className="space-y-2">
+            {av.milestones.map((ms, i) => (
+              <div key={i} className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${ms.isNow ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-blue-200 text-blue-700'}`}>
+                  {ms.isNow ? 'עכשיו' : `מ-${formatDate(ms.fromDate)}`}
+                </span>
+                <span className="text-sm font-bold text-slate-700">
+                  {'🛏'.repeat(Math.min(ms.freeBeds, 4))} {ms.freeBeds} מיט{ms.freeBeds === 1 ? 'ה' : 'ות'} פנוי{ms.freeBeds === 1 ? 'ה' : 'ות'}
+                </span>
+                <span className="text-xs text-slate-400 mr-auto whitespace-nowrap">עד {formatDate(av.sofit)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  })()
+
   return (
     <div className="space-y-4 fade-in">
+      {AvailPopup}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-48"><SearchInput value={search} onChange={setSearch} placeholder="כתובת, עיר, בעלים..."/></div>
         <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}
