@@ -119,19 +119,64 @@ export default function Dashboard() {
     const overdueCount     = gviyaOpen.filter(g => g.taarich && new Date(g.taarich) < new Date()).length
     const contractEndCount = dirot.filter(d => { const r = daysUntil(d.sofit_schirut); return r!==null&&r<=30&&r>=0 }).length
 
-    // ── מיטות שמתפנות בעתיד — לפי taarich_sium בשיבוצים פעילים ──
+    // ── זמינות מיטות לפי דירה — חלון בין סיום שיבוצים לסוף חוזה ──
     const todayStr = new Date().toISOString().slice(0, 10)
     const dirotById = Object.fromEntries(dirot.map(d => [d.id, d]))
-    const futureShibutzim = shibutzim
-      .filter(s => s.taarich_sium && s.taarich_sium > todayStr)
-      .sort((a, b) => a.taarich_sium.localeCompare(b.taarich_sium))
-    // קיבוץ לפי חודש YYYY-MM
-    const futureByMonth = {}
-    futureShibutzim.forEach(s => {
-      const m = s.taarich_sium.slice(0, 7)
-      if (!futureByMonth[m]) futureByMonth[m] = []
-      futureByMonth[m].push({ dirot_id: s.dirot_id, taarich_sium: s.taarich_sium })
+
+    // מחשב יום אחרי תאריך נתון (מיטה פנויה מהיום שאחרי סיום השיבוץ)
+    function dayAfter(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00')
+      d.setDate(d.getDate() + 1)
+      return d.toISOString().slice(0, 10)
+    }
+
+    const availabilityWindows = []
+    dirot.forEach(d => {
+      const sofit = d.sofit_schirut
+      if (!sofit || sofit <= todayStr) return // חוזה הסתיים
+      const totalBeds2 = Number(d.mispar_mitot ?? 0)
+      if (!totalBeds2) return
+
+      const diraShib = shibutzim.filter(s => s.dirot_id === d.id)
+      const currentFree = totalBeds2 - diraShib.length
+
+      // שיבוצים שמסתיימים לפני סוף החוזה
+      const endingShib = diraShib
+        .filter(s => s.taarich_sium && s.taarich_sium < sofit)
+        .sort((a, b) => a.taarich_sium.localeCompare(b.taarich_sium))
+
+      if (currentFree === 0 && endingShib.length === 0) return
+
+      const milestones = []
+
+      // מיטות פנויות כבר עכשיו
+      if (currentFree > 0) {
+        milestones.push({ fromDate: todayStr, freeBeds: currentFree, isNow: true })
+      }
+
+      // מתי כל שיבוץ מסתיים — תאריכים ייחודיים
+      const uniqueEnds = [...new Set(endingShib.map(s => s.taarich_sium))]
+      uniqueEnds.forEach(endDate => {
+        const stillActive = diraShib.filter(
+          sh => !sh.taarich_sium || sh.taarich_sium > endDate
+        ).length
+        const free = totalBeds2 - stillActive
+        if (free > 0) {
+          milestones.push({ fromDate: dayAfter(endDate), freeBeds: free, isNow: false })
+        }
+      })
+
+      if (milestones.length > 0) {
+        availabilityWindows.push({
+          dirot_id: d.id, ktovet: d.ktovet, ir: d.ir, sofit, milestones,
+        })
+      }
     })
+
+    // ספירת מיטות פנויות (מקסימום לכל דירה)
+    const totalFutureBeds = availabilityWindows.reduce(
+      (s, w) => s + Math.max(...w.milestones.map(m => m.freeBeds)), 0
+    )
 
     const result = {
       bochurimCount, dirotCount, shibutzimCount: shibutzim.length,
@@ -144,7 +189,7 @@ export default function Dashboard() {
       overdueCount, contractEndCount,
       currentMonth,
       utilTypes, utilityTotal, dirotWithReadings,
-      dirotById, futureByMonth,
+      dirotById, availabilityWindows, totalFutureBeds,
     }
     setCache(DASHBOARD_CACHE_KEY, result, DASHBOARD_TTL)
     setData(result)
@@ -186,10 +231,7 @@ export default function Dashboard() {
           tashlumimTotal, netProfit, dirotStats, openDebts,
           tachzukaOpen, overdueCount, contractEndCount, currentMonth,
           utilTypes, utilityTotal, dirotWithReadings,
-          dirotById = {}, futureByMonth = {} } = data
-
-  const futureMonths = Object.keys(futureByMonth).sort()
-  const totalFutureBeds = Object.values(futureByMonth).reduce((s, arr) => s + arr.length, 0)
+          availabilityWindows = [], totalFutureBeds = 0 } = data
 
   return (
     <div className="space-y-6 fade-in">
@@ -341,7 +383,7 @@ export default function Dashboard() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Beds — current + future timeline */}
+        {/* Beds — current + future windows per apartment */}
         <Card>
           <CardHeader title="סיכום מיטות" action={<Bed size={18} className="text-slate-400"/>}/>
           <CardBody>
@@ -370,37 +412,47 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* ציר זמן עתידי */}
-            {futureMonths.length > 0 && (
+            {/* חלונות זמינות לפי דירה */}
+            {availabilityWindows.length > 0 && (
               <div className="mt-4 pt-3 border-t border-slate-100">
                 <div className="flex items-center gap-1.5 mb-2">
                   <CalendarClock size={13} className="text-blue-400"/>
-                  <p className="text-xs font-semibold text-slate-500">מתפנות לפי חודש ({totalFutureBeds} מיטות)</p>
+                  <p className="text-xs font-semibold text-slate-500">זמינות מיטות לפי דירה</p>
                 </div>
-                <div className="space-y-1">
-                  {futureMonths.map(month => {
-                    const beds = futureByMonth[month]
-                    // כתובות ייחודיות לאותו חודש
-                    const addrs = [...new Set(beds.map(s => dirotById[s.dirot_id]?.ktovet).filter(Boolean))]
-                    const [y, m] = month.split('-')
-                    const label = new Date(Number(y), Number(m) - 1, 1)
-                      .toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })
-                    return (
-                      <Clickable key={month} to="/shibutzim" params={{ status:'פעיל' }}>
-                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-blue-50 cursor-pointer group transition-colors">
-                          <span className="text-xs font-semibold text-blue-700 w-28 shrink-0 group-hover:underline">{label}</span>
-                          <span className="text-xs font-bold text-emerald-600">{beds.length} מיטות</span>
-                          <span className="text-xs text-slate-400 truncate flex-1">
-                            {addrs.slice(0, 2).join(' • ')}{addrs.length > 2 ? ` +${addrs.length - 2}` : ''}
+                <div className="space-y-3">
+                  {availabilityWindows.map(w => (
+                    <Clickable key={w.dirot_id} to="/shibutzim" params={{ status:'פעיל' }}>
+                      <div className="p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer">
+                        {/* כותרת דירה + סוף חוזה */}
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-bold text-blue-800">
+                            {w.ktovet}{w.ir ? `, ${w.ir}` : ''}
+                          </span>
+                          <span className="text-[10px] text-blue-500 bg-blue-100 px-1.5 py-0.5 rounded-full">
+                            חוזה עד {formatDate(w.sofit)}
                           </span>
                         </div>
-                      </Clickable>
-                    )
-                  })}
+                        {/* ציר אבני דרך */}
+                        <div className="space-y-1">
+                          {w.milestones.map((ms, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${ms.isNow ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-blue-700 border border-blue-200'}`}>
+                                {ms.isNow ? 'עכשיו' : `מ-${formatDate(ms.fromDate)}`}
+                              </span>
+                              <span className="text-xs font-bold text-slate-700">
+                                {'🛏'.repeat(Math.min(ms.freeBeds, 4))} {ms.freeBeds} מיט{ms.freeBeds === 1 ? 'ה' : 'ות'} פנוי{ms.freeBeds === 1 ? 'ה' : 'ות'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">עד {formatDate(w.sofit)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </Clickable>
+                  ))}
                 </div>
               </div>
             )}
-            {futureMonths.length === 0 && occupiedBeds > 0 && (
+            {availabilityWindows.length === 0 && occupiedBeds > 0 && occupiedBeds >= totalBeds && (
               <p className="text-xs text-slate-400 mt-3 text-center">⚠️ לא הוגדרו תאריכי סיום לשיבוצים</p>
             )}
           </CardBody>
