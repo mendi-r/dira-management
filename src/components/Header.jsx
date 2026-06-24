@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Menu, LogOut, Bell, AlertTriangle, AlertCircle, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Users } from 'lucide-react'
 import { useAlerts } from '../contexts/AlertsContext'
 
 const titles = {
