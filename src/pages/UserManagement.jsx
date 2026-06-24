@@ -12,10 +12,10 @@ import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../contexts/AuthContext'
 
 const ROLES = [
-  { value: 'admin',       label: '\u05de\u05e0\u05d4\u05dc \u05de\u05e2\u05e8\u05db\u05ea',  color: 'teal',  desc: '\u05d2\u05d9\u05e9\u05d4 \u05de\u05dc\u05d0\u05d4 \u05dc\u05db\u05dc \u05d4\u05de\u05e1\u05db\u05d9\u05dd + \u05e0\u05d9\u05d4\u05d5\u05dc \u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd' },
-  { value: 'accountant',  label: '\u05e8\u05d5\u05d0\u05d4 \u05d7\u05e9\u05d1\u05d5\u05df',   color: 'blue',  desc: '\u05d2\u05d1\u05d9\u05d9\u05d4, \u05d3\u05d5\u05d7\u05d5\u05ea \u05db\u05e1\u05e4\u05d9\u05d9\u05dd' },
-  { value: 'maintenance', label: '\u05d0\u05d7\u05e8\u05d0\u05d9 \u05ea\u05d7\u05d6\u05d5\u05e7\u05d4', color: 'amber', desc: '\u05ea\u05d7\u05d6\u05d5\u05e7\u05d4 \u05d5\u05e7\u05e8\u05d9\u05d0\u05d5\u05ea \u05de\u05d5\u05e0\u05d9\u05dd' },
-  { value: 'viewer',      label: '\u05e6\u05e4\u05d9\u05d9\u05d4 \u05d1\u05dc\u05d1\u05d3',   color: 'gray',  desc: '\u05e7\u05e8\u05d9\u05d0\u05d4 \u05d1\u05dc\u05d1\u05d3' },
+  { value: 'admin',       label: 'מנהל מערכת',  color: 'teal',  desc: 'גישה מלאה לכל המסכים + ניהול משתמשים' },
+  { value: 'accountant',  label: 'רואה חשבון',   color: 'blue',  desc: 'גבייה, דוחות כספיים' },
+  { value: 'maintenance', label: 'אחראי תחזוקה', color: 'amber', desc: 'תחזוקה וקריאות מונים' },
+  { value: 'viewer',      label: 'צפייה בלבד',   color: 'gray',  desc: 'קריאה בלבד' },
 ]
 
 const EMPTY = { email: '', role: 'admin' }
@@ -59,8 +59,8 @@ export default function UserManagement() {
   }
 
   async function invite() {
-    if (!form.email.trim()) { toast('\u05d9\u05e9 \u05dc\u05d4\u05d6\u05d9\u05df \u05db\u05ea\u05d5\u05d1\u05ea \u05d0\u05d9\u05de\u05d9\u05d9\u05dc', 'error'); return }
-    if (!hasAdmin) { toast('\u05d7\u05e1\u05e8 VITE_SUPABASE_SERVICE_ROLE', 'error'); return }
+    if (!form.email.trim()) { toast('יש להזין כתובת אימייל', 'error'); return }
+    if (!hasAdmin) { toast('חסר VITE_SUPABASE_SERVICE_ROLE', 'error'); return }
     setInviting(true)
     try {
       const { data: newUser, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(form.email.trim())
@@ -70,12 +70,12 @@ export default function UserManagement() {
         { onConflict: 'user_id' }
       )
       if (roleErr) throw roleErr
-      toast('\u05d4\u05d6\u05de\u05e0\u05d4 \u05e0\u05e9\u05dc\u05d7\u05d4 \u05dc-' + form.email + ' \u2713')
+      toast('הזמנה נשלחה ל-' + form.email + ' ✓')
       setInviteModal(false)
       setForm(EMPTY)
       load()
     } catch (e) {
-      toast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + e.message, 'error')
+      toast('שגיאה: ' + e.message, 'error')
     } finally {
       setInviting(false)
     }
@@ -86,25 +86,25 @@ export default function UserManagement() {
     const { error } = await supabase.from('users_roles').update({ role: newRole }).eq('user_id', u.user_id)
     setSaving(false)
     if (error) { toast(error.message, 'error'); return }
-    toast('\u05d4\u05e8\u05e9\u05d0\u05d4 \u05e2\u05d5\u05d3\u05db\u05e0\u05d4 \u2713')
+    toast('הרשאה עודכנה ✓')
     setEditModal(null)
     load()
   }
 
   async function removeUser(u) {
-    if (!await confirm('\u05dc\u05d4\u05e1\u05d9\u05e8 \u05d0\u05ea ' + (u.email ?? u.user_id?.slice(0, 8)) + '?', { danger: true })) return
+    if (!await confirm('להסיר את ' + (u.email ?? u.user_id?.slice(0, 8)) + '?', { danger: true })) return
     const { error } = await supabase.from('users_roles').delete().eq('user_id', u.user_id)
     if (error) { toast(error.message, 'error'); return }
     if (hasAdmin) await supabaseAdmin.auth.admin.deleteUser(u.user_id)
-    toast('\u05d4\u05de\u05e9\u05ea\u05de\u05e9 \u05d4\u05d5\u05e1\u05e8')
+    toast('המשתמש הוסר')
     load()
   }
 
   async function sendPasswordReset(u) {
-    if (!u.email) { toast('\u05d0\u05d9\u05df \u05d0\u05d9\u05de\u05d9\u05d9\u05dc \u05dc\u05de\u05e9\u05ea\u05de\u05e9 \u05d6\u05d4', 'error'); return }
+    if (!u.email) { toast('אין אימייל למשתמש זה', 'error'); return }
     const { error } = await supabase.auth.resetPasswordForEmail(u.email)
     if (error) { toast(error.message, 'error'); return }
-    toast('\u05de\u05d9\u05d9\u05dc \u05d0\u05d9\u05e4\u05d5\u05e1 \u05e0\u05e9\u05dc\u05d7 \u05dc-' + u.email + ' \u2713')
+    toast('מייל איפוס נשלח ל-' + u.email + ' ✓')
     setResetModal(null)
   }
 
@@ -112,8 +112,8 @@ export default function UserManagement() {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-slate-400">
         <Shield size={48} className="opacity-20 mb-4"/>
-        <p className="text-lg font-medium">\u05d0\u05d9\u05df \u05d2\u05d9\u05e9\u05d4</p>
-        <p className="text-sm mt-1">\u05de\u05e1\u05da \u05d6\u05d4 \u05de\u05d9\u05d5\u05e2\u05d3 \u05dc\u05de\u05e0\u05d4\u05dc \u05d4\u05de\u05e2\u05e8\u05db\u05ea \u05d1\u05dc\u05d1\u05d3</p>
+        <p className="text-lg font-medium">{'אין גישה'}</p>
+        <p className="text-sm mt-1">{'מסך זה מיועד למנהל המערכת בלבד'}</p>
       </div>
     )
   }
@@ -129,7 +129,7 @@ export default function UserManagement() {
             <div>
               <p className="font-semibold text-slate-800">{user?.email}</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <Badge color="teal">\u05de\u05e0\u05d4\u05dc \u05de\u05e2\u05e8\u05db\u05ea</Badge>
+                <Badge color="teal">{'מנהל מערכת'}</Badge>
                 <span className="text-xs text-slate-400">{user?.id?.slice(0, 8)}...</span>
               </div>
             </div>
@@ -141,7 +141,7 @@ export default function UserManagement() {
         <div className="flex gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
           <AlertCircle size={18} className="shrink-0 mt-0.5"/>
           <div>
-            <p className="font-medium">\u05db\u05d3\u05d9 \u05dc\u05d4\u05d6\u05de\u05d9\u05df \u05d5\u05dc\u05de\u05d7\u05d5\u05e7 \u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd \u2014 \u05d4\u05d5\u05e1\u05e3 \u05d1-Vercel:</p>
+            <p className="font-medium">{'כדי להזמין ולמחוק משתמשים — הוסף ב-Vercel:'}</p>
             <code className="block mt-1 bg-amber-100 rounded px-2 py-1 text-xs">VITE_SUPABASE_SERVICE_ROLE = sb_secret_...</code>
           </div>
         </div>
@@ -149,14 +149,14 @@ export default function UserManagement() {
 
       <Card>
         <CardHeader
-          title={'\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd \u05de\u05d5\u05e8\u05e9\u05d9\u05dd (' + users.length + ')'}
+          title={'משתמשים מורשים (' + users.length + ')'}
           action={
             <div className="flex gap-2">
               <button onClick={load} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
                 <RefreshCw size={15}/>
               </button>
               <Button icon={UserPlus} onClick={() => { setForm(EMPTY); setInviteModal(true) }}>
-                \u05d4\u05d6\u05de\u05df \u05de\u05e9\u05ea\u05de\u05e9
+                {'הזמן משתמש'}
               </Button>
             </div>
           }
@@ -171,7 +171,7 @@ export default function UserManagement() {
             {users.length === 0 && (
               <div className="py-12 text-center text-slate-400">
                 <Shield size={32} className="mx-auto mb-2 opacity-30"/>
-                <p>\u05dc\u05d0 \u05d4\u05d5\u05d2\u05d3\u05e8\u05d5 \u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd \u05e0\u05d5\u05e1\u05e4\u05d9\u05dd</p>
+                <p>{'לא הוגדרו משתמשים נוספים'}</p>
               </div>
             )}
             {users.map(u => {
@@ -184,8 +184,8 @@ export default function UserManagement() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-800 text-sm">{u.email ?? '(\u05dc\u05dc\u05d0 \u05d0\u05d9\u05de\u05d9\u05d9\u05dc)'}</span>
-                      {isSelf && <span className="text-xs text-teal-600 font-medium">(\u05d0\u05ea\u05d4)</span>}
+                      <span className="font-medium text-slate-800 text-sm">{u.email ?? '(ללא אימייל)'}</span>
+                      {isSelf && <span className="text-xs text-teal-600 font-medium">{'אתה'}</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Badge color={ri.color}>{ri.label}</Badge>
@@ -220,7 +220,7 @@ export default function UserManagement() {
       </Card>
 
       <Card>
-        <CardHeader title="\u05e8\u05de\u05d5\u05ea \u05d4\u05e8\u05e9\u05d0\u05d4"/>
+        <CardHeader title={'רמות הרשאה'}/>
         <div className="divide-y divide-slate-100">
           {ROLES.map(r => (
             <div key={r.value} className="flex items-center gap-3 px-6 py-3">
@@ -231,61 +231,61 @@ export default function UserManagement() {
         </div>
       </Card>
 
-      <Modal open={inviteModal} onClose={() => setInviteModal(false)} title="\u05d4\u05d6\u05de\u05e0\u05ea \u05de\u05e9\u05ea\u05de\u05e9 \u05d7\u05d3\u05e9" size="sm">
+      <Modal open={inviteModal} onClose={() => setInviteModal(false)} title={'הזמנת משתמש חדש'} size="sm">
         <div className="space-y-4">
-          <FormField label="\u05db\u05ea\u05d5\u05d1\u05ea \u05d0\u05d9\u05de\u05d9\u05d9\u05dc" required>
+          <FormField label={'כתובת אימייל'} required>
             <Input type="email" value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               placeholder="user@example.com"/>
           </FormField>
-          <FormField label="\u05e8\u05de\u05ea \u05d4\u05e8\u05e9\u05d0\u05d4">
+          <FormField label={'רמת הרשאה'}>
             <Select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </Select>
           </FormField>
           <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-500 flex gap-2">
             <Mail size={14} className="shrink-0 mt-0.5"/>
-            {hasAdmin ? '\u05d4\u05de\u05e9\u05ea\u05de\u05e9 \u05d9\u05e7\u05d1\u05dc \u05de\u05d9\u05d9\u05dc \u05e2\u05dd \u05e7\u05d9\u05e9\u05d5\u05e8 \u05dc\u05d4\u05d2\u05d3\u05e8\u05ea \u05e1\u05d9\u05e1\u05de\u05d0.' : '\u05e0\u05d3\u05e8\u05e9 VITE_SUPABASE_SERVICE_ROLE \u05d1-Vercel.'}
+            {hasAdmin ? 'המשתמש יקבל מייל עם קישור להגדרת סיסמא.' : 'נדרש VITE_SUPABASE_SERVICE_ROLE ב-Vercel.'}
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <Button variant="secondary" onClick={() => setInviteModal(false)}>\u05d1\u05d9\u05d8\u05d5\u05dc</Button>
+          <Button variant="secondary" onClick={() => setInviteModal(false)}>{'ביטול'}</Button>
           <Button loading={inviting} icon={UserPlus} onClick={invite} disabled={!hasAdmin}>
-            \u05e9\u05dc\u05d7 \u05d4\u05d6\u05de\u05e0\u05d4
+            {'שלח הזמנה'}
           </Button>
         </div>
       </Modal>
 
-      <Modal open={!!editModal} onClose={() => setEditModal(null)} title="\u05e9\u05d9\u05e0\u05d5\u05d9 \u05d4\u05e8\u05e9\u05d0\u05d4" size="sm">
+      <Modal open={!!editModal} onClose={() => setEditModal(null)} title={'שינוי הרשאה'} size="sm">
         {editModal && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              \u05de\u05e9\u05ea\u05de\u05e9: <span className="font-medium">{editModal.email ?? editModal.user_id?.slice(0, 12)}</span>
+              {'משתמש:'} <span className="font-medium">{editModal.email ?? editModal.user_id?.slice(0, 12)}</span>
             </p>
-            <FormField label="\u05d4\u05e8\u05e9\u05d0\u05d4 \u05d7\u05d3\u05e9\u05d4">
+            <FormField label={'הרשאה חדשה'}>
               <Select defaultValue={editModal.role}
                 onChange={e => setEditModal(m => ({ ...m, role: e.target.value }))}>
                 {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </Select>
             </FormField>
             <div className="flex justify-end gap-3 mt-4">
-              <Button variant="secondary" onClick={() => setEditModal(null)}>\u05d1\u05d9\u05d8\u05d5\u05dc</Button>
-              <Button loading={saving} onClick={() => updateRole(editModal, editModal.role)}>\u05e9\u05de\u05d5\u05e8</Button>
+              <Button variant="secondary" onClick={() => setEditModal(null)}>{'ביטול'}</Button>
+              <Button loading={saving} onClick={() => updateRole(editModal, editModal.role)}>{'שמור'}</Button>
             </div>
           </div>
         )}
       </Modal>
 
-      <Modal open={!!resetModal} onClose={() => setResetModal(null)} title="\u05d0\u05d9\u05e4\u05d5\u05e1 \u05e1\u05d9\u05e1\u05de\u05d0" size="sm">
+      <Modal open={!!resetModal} onClose={() => setResetModal(null)} title={'איפוס סיסמא'} size="sm">
         {resetModal && (
           <div className="space-y-4">
             <div className="flex gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
               <Mail size={16} className="shrink-0 mt-0.5"/>
-              <p>\u05de\u05d9\u05d9\u05dc \u05d0\u05d9\u05e4\u05d5\u05e1 \u05e1\u05d9\u05e1\u05de\u05d0 \u05d9\u05d9\u05e9\u05dc\u05d7 \u05d0\u05dc <strong>{resetModal.email}</strong></p>
+              <p>{'מייל איפוס סיסמא יישלח אל'} <strong>{resetModal.email}</strong></p>
             </div>
             <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setResetModal(null)}>\u05d1\u05d9\u05d8\u05d5\u05dc</Button>
-              <Button icon={KeyRound} onClick={() => sendPasswordReset(resetModal)}>\u05e9\u05dc\u05d7 \u05de\u05d9\u05d9\u05dc</Button>
+              <Button variant="secondary" onClick={() => setResetModal(null)}>{'ביטול'}</Button>
+              <Button icon={KeyRound} onClick={() => sendPasswordReset(resetModal)}>{'שלח מייל'}</Button>
             </div>
           </div>
         )}
