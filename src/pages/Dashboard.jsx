@@ -302,7 +302,7 @@ export default function Dashboard() {
         </Clickable>
         <Clickable to="/dirot">
           <StatCard label="דירות" value={dirotCount??0} icon={Home} color="blue"
-            sub={soonApartments > 0 ? `${soonApartments} מתפנות בקרוב` : undefined}/>
+            sub={contractEndCount > 0 ? `${contractEndCount} חוזה מסתיים בקרוב` : undefined}/>
         </Clickable>
         <Clickable to="/shibutzim" params={{ status:'פעיל' }}>
           <StatCard label="שיבוצים פעילים" value={shibutzimCount} icon={Shuffle} color="green"/>
