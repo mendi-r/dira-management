@@ -187,7 +187,8 @@ export default function Dirot() {
       (alertFilter === 'contract' && daysUntil(r.sofit_schirut) !== null && (daysUntil(r.sofit_schirut)??999) <= 30) ||
       (alertFilter === 'insurance' && daysUntil(r.bituach_chadush) !== null && (daysUntil(r.bituach_chadush)??999) <= 30)
     const freeBedMatch = !freeBedFilter ||
-      ((r.mispar_mitot ?? 0) - (occupantsMap[r.id] ?? 0)) > 0
+      ((r.mispar_mitot ?? 0) - (occupantsMap[r.id] ?? 0)) > 0 ||
+      !!availabilityMap[r.id]  // מתפנות בעתיד
     return textMatch && alertMatch && freeBedMatch
   })
 
@@ -777,7 +778,7 @@ export default function Dirot() {
               ? 'bg-teal-600 text-white border-teal-600'
               : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'
           }`}>
-          מיטות פנויות בלבד
+          מיטות פנויות / מתפנות
         </button>
         <button onClick={load} className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center" title="רענן">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
