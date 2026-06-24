@@ -1,8 +1,8 @@
-const { createClient } = require('@supabase/supabase-js')
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl  = process.env.VITE_SUPABASE_URL
-const anonKey      = process.env.VITE_SUPABASE_ANON_KEY
-const serviceKey   = process.env.VITE_SUPABASE_SERVICE_ROLE
+const supabaseUrl = process.env.VITE_SUPABASE_URL
+const anonKey     = process.env.VITE_SUPABASE_ANON_KEY
+const serviceKey  = process.env.VITE_SUPABASE_SERVICE_ROLE
 
 function getAdminClient() {
   return createClient(supabaseUrl, serviceKey, {
@@ -10,14 +10,13 @@ function getAdminClient() {
   })
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method !== 'POST')   { res.status(405).json({ error: 'Method not allowed' }); return }
 
-  // Verify caller is authenticated
   const token = (req.headers.authorization || '').replace('Bearer ', '')
   if (!token) { res.status(401).json({ error: 'Unauthorized' }); return }
 
@@ -25,10 +24,9 @@ module.exports = async function handler(req, res) {
   const { data: { user }, error: authErr } = await anonClient.auth.getUser(token)
   if (authErr || !user) { res.status(401).json({ error: 'Invalid token' }); return }
 
-  // Verify caller is admin
   const { data: roleRow } = await anonClient
     .from('users_roles').select('role').eq('user_id', user.id).single()
-  if (roleRow?.role !== 'admin') { res.status(403).json({ error: 'Forbidden' }); return }
+  if (roleRow?.role !== 'super_admin') { res.status(403).json({ error: 'Forbidden' }); return }
 
   const { action, email, password, userId, ban } = req.body
   const adminClient = getAdminClient()
