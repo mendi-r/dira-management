@@ -55,7 +55,10 @@ export default function Tashlumim() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    const thisMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
+    const now = new Date()
+    const thisMonth = now.toISOString().slice(0, 7) // YYYY-MM
+    // תחילת החודש הבא — למניעת בעיית ימים (31 ביוני וכו')
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10)
     let q = supabase.from('tashlumim_baalim')
       .select('*, dirot(ktovet,ir,baalim_shem,baalim_telefon1)')
     if (statusFilter) q = q.eq('status', statusFilter)
@@ -63,11 +66,11 @@ export default function Tashlumim() {
     const [{ data: t }, { data: d }, { data: riut }] = await Promise.all([
       q,
       supabase.from('dirot').select('id,ktovet,ir,baalim_shem,ola_schirut_chodshi,payment_day').order('ktovet'),
-      // קריאות מונה לחודש הנוכחי בלבד
+      // קריאות מונה לחודש הנוכחי בלבד — lt על ה-1 בחודש הבא
       supabase.from('riut')
         .select('dirot_id,sug_mone,skhum_leshalem,id')
         .gte('taarich_kriah', thisMonth + '-01')
-        .lte('taarich_kriah', thisMonth + '-31')
+        .lt('taarich_kriah', nextMonthStart)
         .eq('is_kriah_ptika', false),
     ])
     // מיון יציב: לפי כתובת דירה, אחר כך לפי חודש
