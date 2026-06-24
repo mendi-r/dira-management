@@ -57,7 +57,7 @@ export default function Gviya() {
     if (monthFilter)  q = q.eq('chodesh', monthFilter)
     const [{ data:g },{ data:b },{ data:d }] = await Promise.all([
       q,
-      supabase.from('bochurim').select('id,shem,mishpacha,telefon,amla_chodshit').order('mishpacha').order('shem'),
+      supabase.from('bochurim').select('id,shem,mishpacha,telefon,amla_chodshit').eq('status','פעיל').order('mishpacha').order('shem'),
       supabase.from('dirot').select('id,ktovet,ir').order('ktovet'),
     ])
     setRows(g??[]); setBochurim(b??[]); setDirot(d??[])

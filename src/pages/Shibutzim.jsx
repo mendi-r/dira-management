@@ -87,8 +87,8 @@ export default function Shibutzim() {
     if (statusFilter) q = q.eq('status', statusFilter)
     const [{ data:s },{ data:b },{ data:d }] = await Promise.all([
       q,
-      supabase.from('bochurim').select('id,shem,mishpacha').order('mishpacha').order('shem'),
-      supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi,mispar_mitot,payment_day,tchilat_schirut,sofit_schirut').order('ktovet'),
+      supabase.from('bochurim').select('id,shem,mishpacha').eq('status','פעיל').order('mishpacha').order('shem'),
+      supabase.from('dirot').select('id,ktovet,ir,ola_schirut_chodshi,mispar_mitot,payment_day,tchilat_schirut,sofit_schirut').eq('status','פעיל').order('ktovet'),
     ])
     setRows(s??[]); setBochurim(b??[]); setDirot(d??[])
     setLoading(false)
