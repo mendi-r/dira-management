@@ -173,7 +173,7 @@ export default function Bochurim() {
       logActivity('ARCHIVE', 'bochurim', id, name)
       toast(`${name} הוסר מהרשימה — התנועות נשמרו`)
     }
-    load(true)
+    setRows(prev => prev.filter(r => r.id !== id))
   }
 
   // Visa status helper
