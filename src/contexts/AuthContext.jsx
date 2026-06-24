@@ -38,4 +38,10 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{ user, role, isAdmin: role === 'admin' || role === 'super_admin', isSuperAdmin: role === 'super_admin', loading, signIn, signOut, viewAsOwnerId, setViewAsOwnerId }}>
       {children}
-    </AuthContext.Provid
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  return useContext(AuthContext)
+}
